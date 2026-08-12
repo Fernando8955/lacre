@@ -22,6 +22,15 @@
       <p>Cinco lotes. Cem fichas. Os dois pagam.</p>
     </header>
 
+    <div class="demo" data-demo>
+      <div class="demo-topo" data-demo-topo>Lote 1 de 5</div>
+      <div class="demo-mesa">
+        <div class="demo-lado" data-demo-a><small>Você</small><b>?</b></div>
+        <div class="demo-lado" data-demo-b><small>Ele</small><b>?</b></div>
+      </div>
+      <div class="demo-legenda" data-demo-legenda>Cada um tem 100 fichas para os 5 lotes.</div>
+    </div>
+
     <div class="papel">
       <label class="campo">
         <span>Seu nome</span>
@@ -61,6 +70,15 @@
       <h1>Lacre</h1>
       <p id="convite-chamada">Você foi convidado para uma partida</p>
     </header>
+
+    <div class="demo" data-demo>
+      <div class="demo-topo" data-demo-topo>Lote 1 de 5</div>
+      <div class="demo-mesa">
+        <div class="demo-lado" data-demo-a><small>Você</small><b>?</b></div>
+        <div class="demo-lado" data-demo-b><small>Ele</small><b>?</b></div>
+      </div>
+      <div class="demo-legenda" data-demo-legenda>Cada um tem 100 fichas para os 5 lotes.</div>
+    </div>
 
     <div class="papel">
       <p class="sobrescrito">Como funciona</p>
@@ -116,6 +134,7 @@
       </div>
       <button id="btn-lacrar" class="acao">Lacrar lance</button>
       <p class="apoio">Ninguém vê esse número até os dois lacrarem.</p>
+      <p class="dica" id="dica-primeira" hidden>Dar <b>0</b> também é jogada: você entrega o lote e chega mais rico nos próximos. Gastar tudo agora garante este lote e te deixa sem nada depois.</p>
       <details class="lembrete">
         <summary>Como funciona</summary>
         <ol class="regras">
@@ -141,13 +160,27 @@
   <section class="tela" data-para="revelacao">
     <div class="papel centro">
       <p class="sobrescrito" id="rev-lote">Lote 1</p>
-      <p class="veredito" id="rev-veredito">—</p>
-      <div class="dois-lances">
-        <div><small>Você</small><strong id="rev-meu">0</strong></div>
-        <div><small id="rev-nome-dele">Ele</small><strong id="rev-dele">0</strong></div>
+
+      <div class="revelacao" id="rev-palco">
+        <div class="env" id="rev-env-meu">
+          <div class="lacre-selo"><span>lacrado</span></div>
+          <div class="env-conteudo">
+            <small>Você</small>
+            <strong id="rev-meu">0</strong>
+          </div>
+        </div>
+        <div class="env" id="rev-env-dele">
+          <div class="lacre-selo"><span>lacrado</span></div>
+          <div class="env-conteudo">
+            <small id="rev-nome-dele">Ele</small>
+            <strong id="rev-dele">0</strong>
+          </div>
+        </div>
       </div>
-      <p class="apoio">Os dois pagaram.</p>
-      <button id="btn-seguir" class="acao">Próximo lote</button>
+
+      <p class="veredito surge" id="rev-veredito">—</p>
+      <p class="apoio surge">Os dois pagaram o que ofereceram.</p>
+      <button id="btn-seguir" class="acao surge">Próximo lote</button>
     </div>
   </section>
 

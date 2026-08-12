@@ -275,6 +275,17 @@ function aplicar(d) {
   desenhar();
 }
 
+// Reinicia a animação a cada lote: sem isso ela só rodaria na primeira vez.
+function abrirEnvelopes() {
+  const palco = $('rev-palco');
+  const tela = document.querySelector('.tela[data-para="revelacao"]');
+  palco.classList.remove('abrir');
+  tela.classList.remove('revelou');
+  void palco.offsetWidth; // força o navegador a reprocessar antes de reanimar
+  palco.classList.add('abrir');
+  tela.classList.add('revelou');
+}
+
 function listaHistorico(el, h) {
   if (!h.length) { el.innerHTML = ''; return; }
   const itens = h
@@ -339,13 +350,16 @@ function desenhar() {
     const u = v.ultimoLote;
     $('rev-lote').textContent = 'Lote ' + u.lote;
     const ve = $('rev-veredito');
-    if (u.meu > u.dele) { ve.className = 'veredito ganhei'; ve.textContent = 'Você levou o lote'; }
-    else if (u.meu < u.dele) { ve.className = 'veredito perdi'; ve.textContent = (v.ele ? v.ele.nome : 'Ele') + ' levou o lote'; }
-    else { ve.className = 'veredito'; ve.textContent = 'Lance igual — ninguém leva'; }
+    if (u.meu > u.dele) { ve.className = 'veredito surge ganhei'; ve.textContent = 'Você levou o lote'; }
+    else if (u.meu < u.dele) { ve.className = 'veredito surge perdi'; ve.textContent = (v.ele ? v.ele.nome : 'Ele') + ' levou o lote'; }
+    else { ve.className = 'veredito surge'; ve.textContent = 'Lance igual — ninguém leva'; }
     $('rev-meu').textContent = u.meu;
     $('rev-dele').textContent = u.dele;
     $('rev-nome-dele').textContent = v.ele ? v.ele.nome : 'Ele';
+    $('rev-env-meu').classList.toggle('venceu', u.meu > u.dele);
+    $('rev-env-dele').classList.toggle('venceu', u.dele > u.meu);
     corpo.dataset.tela = 'revelacao';
+    abrirEnvelopes();
     return;
   }
 
@@ -364,6 +378,10 @@ function desenhar() {
     $('painel-lacrado').hidden = true;
     $('lance-slider').max = Math.max(v.eu.fichas, 1);
     mostrarLance(v.eu.fichas);
+    // A dica aparece uma vez só, no lote 1 da primeira partida da pessoa.
+    const novato = !localStorage.getItem('lacre_jogou');
+    $('dica-primeira').hidden = !(novato && v.lote === 1);
+    if (v.lote > 1) localStorage.setItem('lacre_jogou', '1');
   }
 
   listaHistorico($('historico'), v.historico);
@@ -403,6 +421,41 @@ function tocarRelogio() {
 
 // Quem chega por link vê a regra antes de entrar. Dois tipos de link:
 // ?sala=ABCD leva a uma partida específica; ?jogar=1 é o link aberto do grupo.
+// Demonstração de dez segundos. Ninguém lê tutorial de jogo, mas todo mundo
+// entende assistindo uma mão — é o jeito que se aprende truco na mesa.
+const ROTEIRO = [
+  { topo: 'Lote 1 de 5', a: '?', b: '?', ganhou: null, texto: 'Cada um tem 100 fichas para os 5 lotes. Os lances são secretos.', ms: 2200 },
+  { topo: 'Lote 1 de 5', a: '27', b: '19', ganhou: 'a', texto: 'Maior lance leva o lote. <b>Mas os dois pagam.</b>', ms: 2600 },
+  { topo: 'Fichas restantes', a: '73', b: '81', ganhou: null, texto: 'Você levou o lote, e mesmo assim gastou mais que ele.', ms: 2400 },
+  { topo: 'Lote 2 de 5', a: '0', b: '12', ganhou: 'b', texto: 'Dar <b>0</b> é jogada: entrega o lote de graça e guarda fichas.', ms: 2600 },
+  { topo: 'Placar', a: '1', b: '1', ganhou: null, texto: 'Quem levar <b>3 lotes</b> vence a partida.', ms: 2200 },
+];
+
+function montarDemo(caixa) {
+  const topo = caixa.querySelector('[data-demo-topo]');
+  const a = caixa.querySelector('[data-demo-a]');
+  const b = caixa.querySelector('[data-demo-b]');
+  const legenda = caixa.querySelector('[data-demo-legenda]');
+  let i = 0;
+  let timer = null;
+
+  function passo() {
+    const q = ROTEIRO[i];
+    topo.textContent = q.topo;
+    a.querySelector('b').textContent = q.a;
+    b.querySelector('b').textContent = q.b;
+    a.classList.toggle('ganhou', q.ganhou === 'a');
+    b.classList.toggle('ganhou', q.ganhou === 'b');
+    legenda.innerHTML = q.texto;
+    i = (i + 1) % ROTEIRO.length;
+    timer = setTimeout(passo, q.ms);
+  }
+  passo();
+  return () => clearTimeout(timer);
+}
+
+document.querySelectorAll('[data-demo]').forEach((el) => montarDemo(el));
+
 const params = new URLSearchParams(location.search);
 const salaDoLink = params.get('sala');
 const meuNome = nomeSalvo();
