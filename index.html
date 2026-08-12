@@ -32,89 +32,63 @@
     </div>
 
     <div class="papel">
-      <label class="campo">
-        <span>Seu nome</span>
-        <input id="nome" type="text" maxlength="16" placeholder="Fernando" autocomplete="nickname">
-      </label>
-
-      <fieldset class="campo">
-        <legend>Ritmo</legend>
-        <div class="opcoes">
-          <label><input type="radio" name="banco" value="diario" checked><span>12 horas<small>ao longo do dia</small></span></label>
-          <label><input type="radio" name="banco" value="rapido"><span>3 minutos<small>na hora</small></span></label>
-        </div>
-      </fieldset>
-
-      <button id="btn-fila" class="acao">Jogar agora</button>
-      <p class="apoio centro">Você é emparelhado com quem estiver na fila.</p>
-
-      <div class="divisor"><span>ou jogue com quem você escolher</span></div>
-
-      <button id="btn-criar" class="acao vazada">Criar sala privada</button>
-
-      <div class="divisor"><span>ou entre com um código</span></div>
-
-      <label class="campo">
-        <span>Código da sala</span>
-        <input id="codigo" type="text" maxlength="4" placeholder="ABCD" autocapitalize="characters" autocomplete="off" spellcheck="false" class="codigo-input">
-      </label>
-      <button id="btn-entrar" class="acao vazada">Entrar</button>
-    </div>
-
-    <p class="regra-curta">Cada um dá um lance secreto por lote. Quem der o maior leva o lote — e os dois pagam o que ofereceram. Quem levar três lotes vence.</p>
-  </section>
-
-  <!-- CONVITE (quem chega pelo link) -->
-  <section class="tela" data-para="convite">
-    <header class="marca">
-      <h1>Lacre</h1>
-      <p id="convite-chamada">Você foi convidado para uma partida</p>
-    </header>
-
-    <div class="demo" data-demo>
-      <div class="demo-topo" data-demo-topo>Lote 1 de 5</div>
-      <div class="demo-mesa">
-        <div class="demo-lado" data-demo-a><small>Você</small><b>?</b></div>
-        <div class="demo-lado" data-demo-b><small>Ele</small><b>?</b></div>
-      </div>
-      <div class="demo-legenda" data-demo-legenda>Cada um tem 100 fichas para os 5 lotes.</div>
-    </div>
-
-    <div class="papel">
       <p class="sobrescrito">Como funciona</p>
       <ol class="regras">
-        <li>Você tem <b>100 fichas</b> para os <b>5 lotes</b> da partida.</li>
         <li>Em cada lote os dois dão um lance <b>secreto e ao mesmo tempo</b>.</li>
-        <li>Quem der o maior lance leva o lote — <b>mas os dois pagam</b> o que ofereceram.</li>
-        <li>Quem levar <b>3 lotes</b> vence. Empatou em lotes? Ganha quem guardou mais fichas.</li>
+        <li>Maior lance leva o lote — <b>mas os dois pagam</b> o que ofereceram.</li>
+        <li>Quem levar <b>3 lotes</b> vence a partida.</li>
+        <li>Você tem <b>1 hora</b> para responder cada lote. Sumiu, perde o lote.</li>
       </ol>
-      <p class="apoio">Dar <b>0</b> é jogada válida: você entrega o lote de graça e chega mais rico no fim. Gastar tudo cedo garante um lote e te deixa sem nada depois.</p>
+      <p class="apoio">A meta do dia é <b>15 partidas</b>. Vitória vale 3 pontos, empate 1. O ranking zera à meia-noite.</p>
     </div>
 
     <div class="papel">
       <label class="campo">
         <span>Seu nome</span>
-        <input id="convite-nome" type="text" maxlength="16" placeholder="Seu nome" autocomplete="nickname">
+        <input id="nome" type="text" maxlength="16" placeholder="Como querem te chamar" autocomplete="nickname">
       </label>
-      <button id="btn-convite-entrar" class="acao">Entrar na partida</button>
-      <p class="apoio centro" id="convite-rodape">Sala <b id="convite-codigo">----</b></p>
+      <button id="btn-entrar" class="acao">Entrar na temporada de hoje</button>
     </div>
   </section>
 
-  <!-- ESPERA -->
-  <section class="tela" data-para="espera">
-    <div class="papel centro">
-      <p class="sobrescrito" id="espera-titulo">Sala criada</p>
-      <p class="codigo-grande" id="codigo-sala">----</p>
-      <p class="apoio" id="espera-instrucao">Mande esse código para quem vai jogar com você.</p>
-      <button id="btn-copiar" class="acao">Copiar convite</button>
-      <p class="apoio pulsando" id="espera-status">Esperando o segundo jogador…</p>
-      <button id="btn-cancelar" class="acao vazada">Cancelar sala</button>
+  <!-- PAINEL -->
+  <section class="tela" data-para="painel">
+    <div class="cabecalho">
+      <div>
+        <div class="ola" id="painel-nome">—</div>
+        <div class="sub" id="painel-tempo">—</div>
+      </div>
+      <button id="btn-sair" class="mini">Sair</button>
+    </div>
+
+    <div class="papel">
+      <div class="meta-topo">
+        <div><span class="sobrescrito">Sua meta de hoje</span></div>
+        <div class="meta-num"><b id="meta-feitas">0</b> <span id="meta-total">/ 15</span></div>
+      </div>
+      <div class="barra"><div class="barra-cheia" id="meta-barra"></div></div>
+      <div class="meta-linha">
+        <span id="meta-pontos">0 pontos</span>
+        <span id="meta-posicao">—</span>
+      </div>
+      <button id="btn-nova" class="acao">Nova partida</button>
+    </div>
+
+    <div id="lista-partidas"></div>
+
+    <div class="bloco">
+      <h2>Ranking de hoje</h2>
+      <div id="tabela-ranking" class="papel"></div>
     </div>
   </section>
 
-  <!-- MESA (lance / lacrado) -->
+  <!-- MESA -->
   <section class="tela" data-para="mesa">
+    <div class="cabecalho">
+      <button id="btn-voltar" class="mini">← Painel</button>
+      <div class="sub" id="mesa-prazo">—</div>
+    </div>
+
     <div class="placar">
       <div class="lado" id="lado-eu"></div>
       <div class="lote-atual"><span id="lote-num">1</span><small>de 5</small></div>
@@ -148,8 +122,8 @@
 
     <div class="papel centro" id="painel-lacrado" hidden>
       <div class="selo"><span>lacrado</span></div>
-      <p class="apoio">Seu lance está no cofre. <strong id="lacrado-quem">Esperando o outro jogador.</strong></p>
-      <p class="apoio">Pode fechar a página. O relógio dele continua correndo.</p>
+      <p class="apoio">Seu lance está no cofre. <strong id="lacrado-quem">Esperando o adversário.</strong></p>
+      <p class="apoio">Pode voltar ao painel e jogar outra partida enquanto isso.</p>
       <button id="btn-cutucar" class="acao vazada">Avisar no WhatsApp</button>
     </div>
 
@@ -164,17 +138,11 @@
       <div class="revelacao" id="rev-palco">
         <div class="env" id="rev-env-meu">
           <div class="lacre-selo"><span>lacrado</span></div>
-          <div class="env-conteudo">
-            <small>Você</small>
-            <strong id="rev-meu">0</strong>
-          </div>
+          <div class="env-conteudo"><small>Você</small><strong id="rev-meu">0</strong></div>
         </div>
         <div class="env" id="rev-env-dele">
           <div class="lacre-selo"><span>lacrado</span></div>
-          <div class="env-conteudo">
-            <small id="rev-nome-dele">Ele</small>
-            <strong id="rev-dele">0</strong>
-          </div>
+          <div class="env-conteudo"><small id="rev-nome-dele">Ele</small><strong id="rev-dele">0</strong></div>
         </div>
       </div>
 
@@ -184,7 +152,7 @@
     </div>
   </section>
 
-  <!-- FIM -->
+  <!-- FIM DA PARTIDA -->
   <section class="tela" data-para="fim">
     <div class="papel centro">
       <p class="veredito grande" id="fim-titulo">—</p>
@@ -193,9 +161,8 @@
         <div><small>Seus lotes</small><strong id="fim-meus-lotes">0</strong></div>
         <div><small>Suas fichas</small><strong id="fim-minhas-fichas">0</strong></div>
       </div>
-      <p class="apoio" id="revanche-aviso" hidden></p>
-      <button id="btn-revanche" class="acao">Jogar de novo</button>
-      <button id="btn-novo" class="acao vazada">Sair</button>
+      <button id="btn-outra" class="acao">Jogar outra</button>
+      <button id="btn-painel" class="acao vazada">Ver o painel</button>
     </div>
     <div class="historico" id="historico-fim"></div>
   </section>

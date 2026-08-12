@@ -1,42 +1,18 @@
-// Lacre — cliente. Sem framework: são cinco telas e quatro chamadas de API.
+// Lacre — cliente da temporada.
+// A pessoa tem várias partidas abertas ao mesmo tempo. O painel é a casa;
+// a mesa é onde se dá o lance. Nada aqui decide regra: o servidor decide.
 
 const $ = (id) => document.getElementById(id);
 const corpo = document.body;
 
-let sessao = carregarSessao();
-let visao = null;
+let token = localStorage.getItem('lacre_token') || '';
+let meuNome = localStorage.getItem('lacre_nome') || '';
+let partidaId = null;
+let vistaPartida = null;
 let loteJaRevelado = 0;
 let lance = 0;
-let relogio = null;
 let pesquisa = null;
-
-function carregarSessao() {
-  try {
-    return JSON.parse(localStorage.getItem('lacre') || 'null');
-  } catch {
-    return null;
-  }
-}
-function salvarSessao(s) {
-  sessao = s;
-  if (s) localStorage.setItem('lacre', JSON.stringify(s));
-  else localStorage.removeItem('lacre');
-}
-
-// O apelido fica guardado à parte da sessão: é o que faz a pessoa não
-// precisar se apresentar de novo a cada partida, sem exigir cadastro.
-function lembrarNome(n) {
-  const limpo = String(n || '').trim();
-  if (limpo) localStorage.setItem('lacre_nome', limpo);
-  return limpo;
-}
-function nomeSalvo() {
-  try {
-    return localStorage.getItem('lacre_nome') || '';
-  } catch {
-    return '';
-  }
-}
+let relogio = null;
 
 function avisar(msg) {
   const el = $('aviso');
@@ -48,159 +24,205 @@ function avisar(msg) {
 
 async function api(caminho, opcoes) {
   const r = await fetch(caminho, opcoes);
-  const dados = await r.json().catch(() => ({ erro: 'Resposta inválida' }));
-  if (!r.ok) throw new Error(dados.erro || 'Deu problema na conexão');
-  return dados;
+  const d = await r.json().catch(() => ({ erro: 'Resposta inválida do servidor' }));
+  if (!r.ok) throw new Error(d.erro || 'Deu problema na conexão');
+  return d;
 }
 
 function tempoTexto(s) {
   if (s === null || s === undefined) return '';
-  if (s >= 3600) return Math.floor(s / 3600) + 'h' + String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  if (s <= 0) return 'acabou';
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h + 'h' + String(m).padStart(2, '0');
+  }
   const m = Math.floor(s / 60);
-  const r = Math.floor(s % 60);
-  return m + ':' + String(r).padStart(2, '0');
+  return m > 0 ? m + ' min' : s + 's';
 }
 
-// --- Início ---------------------------------------------------------------
-
-$('btn-criar').onclick = async () => {
-  const banco = document.querySelector('input[name="banco"]:checked').value;
-  try {
-    const d = await api('/api/sala', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ nome: lembrarNome($('nome').value), banco }),
-    });
-    salvarSessao({ codigo: d.codigo, token: d.token });
-    $('codigo-sala').textContent = d.codigo;
-    corpo.dataset.tela = 'espera';
-    iniciarPesquisa();
-  } catch (e) {
-    avisar(e.message);
-  }
-};
-
-let modoConvite = 'sala';
-
-async function entrarNaFila(nome) {
-  const d = await api('/api/fila', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nome: lembrarNome(nome), banco: 'rapido' }),
-  });
-  salvarSessao({ codigo: d.codigo, token: d.token, fila: true });
-  history.replaceState(null, '', location.pathname);
-  iniciarPesquisa();
-}
-
-$('btn-fila').onclick = async () => {
-  try {
-    await entrarNaFila($('nome').value);
-  } catch (e) {
-    avisar(e.message);
-  }
-};
-
-async function entrarNaSala(codigo, nome) {
-  const d = await api('/api/entrar', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ codigo, nome: lembrarNome(nome) }),
-  });
-  salvarSessao({ codigo: d.codigo, token: d.token });
-  // Tira o ?sala= da barra de endereço para o refresh não voltar ao convite.
-  history.replaceState(null, '', location.pathname);
-  iniciarPesquisa();
-}
+// --- Entrada ---------------------------------------------------------------
 
 $('btn-entrar').onclick = async () => {
-  const codigo = $('codigo').value.trim().toUpperCase();
-  if (codigo.length !== 4) return avisar('O código tem 4 letras.');
+  const nome = $('nome').value.trim();
+  if (!nome) return avisar('Escreva um nome para aparecer no ranking.');
   try {
-    await entrarNaSala(codigo, $('nome').value);
+    const d = await api('/api/entrar', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nome, token }),
+    });
+    token = d.token;
+    meuNome = d.nome;
+    localStorage.setItem('lacre_token', token);
+    localStorage.setItem('lacre_nome', meuNome);
+    irParaPainel();
   } catch (e) {
     avisar(e.message);
   }
 };
 
-$('btn-convite-entrar').onclick = async () => {
-  try {
-    if (modoConvite === 'fila') {
-      await entrarNaFila($('convite-nome').value);
-    } else {
-      const codigo = $('convite-codigo').textContent.trim().toUpperCase();
-      await entrarNaSala(codigo, $('convite-nome').value);
-    }
-  } catch (e) {
-    avisar(e.message);
-  }
-};
-
-$('btn-copiar').onclick = async () => {
-  // Numa sala privada o link leva à sala. Na fila, o link é aberto:
-  // pode ser jogado no grupo e serve para todo mundo.
-  const link = sessao.fila
-    ? `${location.origin}/?jogar=1`
-    : `${location.origin}/?sala=${sessao.codigo}`;
-  const texto = sessao.fila
-    ? `Partida de Lacre valendo. Clica e entra na fila — leva 2 minutos:\n${link}`
-    : `Te chamei pra uma partida de Lacre. É rápido, cinco lotes:\n${link}`;
-  try {
-    if (navigator.share) await navigator.share({ text: texto });
-    else { await navigator.clipboard.writeText(texto); avisar('Convite copiado.'); }
-  } catch { /* usuário cancelou */ }
-};
-
-// Sair da sala de espera. Precisa limpar a sessão salva, senão o app
-// devolve a pessoa para a mesma sala travada quando ela voltar.
-$('btn-cancelar').onclick = () => {
-  salvarSessao(null);
+$('btn-sair').onclick = () => {
   pararPesquisa();
-  visao = null;
-  loteJaRevelado = 0;
+  localStorage.removeItem('lacre_token');
+  token = '';
+  partidaId = null;
   corpo.dataset.tela = 'inicio';
 };
 
-$('btn-revanche').onclick = async () => {
-  if (!sessao) return;
-  $('btn-revanche').disabled = true;
+// --- Painel ----------------------------------------------------------------
+
+function irParaPainel() {
+  partidaId = null;
+  vistaPartida = null;
+  loteJaRevelado = 0;
+  corpo.dataset.tela = 'painel';
+  iniciarPesquisa(carregarPainel, 8000);
+}
+
+$('btn-voltar').onclick = irParaPainel;
+$('btn-painel').onclick = irParaPainel;
+
+$('btn-nova').onclick = async () => {
+  $('btn-nova').disabled = true;
   try {
-    const d = await api('/api/revanche', {
+    const d = await api('/api/nova', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ codigo: sessao.codigo, token: sessao.token }),
+      body: JSON.stringify({ token }),
     });
-    loteJaRevelado = 0;
-    salvarSessao({ codigo: d.codigo, token: d.token, fila: false });
-    iniciarPesquisa();
+    if (d.pareado) abrirPartida(d.id);
+    else { avisar('Você entrou na fila. Assim que alguém aparecer, a partida começa.'); await carregarPainel(); }
   } catch (e) {
     avisar(e.message);
   } finally {
-    $('btn-revanche').disabled = false;
+    $('btn-nova').disabled = false;
   }
 };
 
-// Notificação pobre e eficaz: abre o WhatsApp com a mensagem pronta.
-// Funciona em qualquer aparelho e não depende de permissão de push.
-$('btn-cutucar').onclick = () => {
-  if (!sessao) return;
-  const link = `${location.origin}/?sala=${sessao.codigo}`;
-  const texto = `Já lacrei meu lance no Lacre. É a sua vez:\n${link}`;
-  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(texto), '_blank');
+$('btn-outra').onclick = async () => {
+  $('btn-outra').disabled = true;
+  try {
+    const d = await api('/api/nova', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    if (d.pareado) abrirPartida(d.id);
+    else { avisar('Você entrou na fila. Assim que alguém aparecer, a partida começa.'); irParaPainel(); }
+  } catch (e) {
+    avisar(e.message);
+  } finally {
+    $('btn-outra').disabled = false;
+  }
 };
 
-$('btn-novo').onclick = () => {
-  salvarSessao(null);
-  pararPesquisa();
-  visao = null;
+async function carregarPainel() {
+  if (!token) return;
+  let p;
+  try {
+    p = await api('/api/painel?token=' + encodeURIComponent(token));
+  } catch (e) {
+    if (String(e.message).includes('não encontrado')) {
+      localStorage.removeItem('lacre_token');
+      token = '';
+      pararPesquisa();
+      corpo.dataset.tela = 'inicio';
+    }
+    return;
+  }
+
+  $('painel-nome').textContent = p.nome;
+  $('painel-tempo').textContent = 'A temporada de hoje acaba em ' + tempoTexto(p.terminaEm);
+
+  const feitas = Math.min(p.eu.partidas, p.meta);
+  $('meta-feitas').textContent = p.eu.partidas;
+  $('meta-total').textContent = '/ ' + p.meta;
+  $('meta-barra').style.width = Math.round((feitas / p.meta) * 100) + '%';
+  $('meta-pontos').textContent =
+    p.eu.pontos + (p.eu.pontos === 1 ? ' ponto' : ' pontos') + ' · ' + p.eu.vitorias + ' vitórias';
+  $('meta-posicao').textContent = p.eu.posicao ? p.eu.posicao + 'º lugar' : 'sem posição ainda';
+
+  desenharPartidas(p.partidas);
+  desenharRanking(p.ranking);
+}
+
+function desenharPartidas(lista) {
+  const el = $('lista-partidas');
+  if (!lista.length) {
+    el.innerHTML =
+      '<div class="bloco"><h2>Suas partidas</h2><div class="papel centro"><p class="apoio">Nenhuma partida aberta. Toque em <b>Nova partida</b> para começar.</p></div></div>';
+    return;
+  }
+  const suaVez = lista.filter((p) => p.suaVez).length;
+  let h = '<div class="bloco"><h2>Suas partidas</h2>';
+  if (suaVez) h += '<div class="chamada">' + suaVez + (suaVez === 1 ? ' esperando o seu lance' : ' esperando o seu lance') + '</div>';
+  h += '<div class="cartoes">';
+  for (const p of lista) {
+    const esperando = p.fase === 'aguardando';
+    const cls = esperando ? 'cartao aguardando' : p.suaVez ? 'cartao vez' : 'cartao';
+    const quem = esperando ? 'Procurando adversário…' : p.adversario;
+    const detalhe = esperando
+      ? 'Você entra na partida assim que alguém aparecer'
+      : 'Lote ' + p.lote + ' · ' + p.meusLotes + ' — ' + p.lotesDele + ' · ' + p.fichas + ' fichas';
+    const acao = esperando
+      ? ''
+      : p.suaVez
+      ? '<div class="cartao-acao">Sua vez · ' + tempoTexto(p.prazo) + '</div>'
+      : '<div class="cartao-espera">Ele tem ' + tempoTexto(p.prazo) + '</div>';
+    h +=
+      '<button class="' + cls + '" data-partida="' + p.id + '"' + (esperando ? ' disabled' : '') + '>' +
+      '<div class="cartao-txt"><div class="cartao-nome">' + quem + '</div>' +
+      '<div class="cartao-sub">' + detalhe + '</div></div>' + acao + '</button>';
+  }
+  el.innerHTML = h + '</div></div>';
+  el.querySelectorAll('[data-partida]').forEach((b) => {
+    b.onclick = () => abrirPartida(b.dataset.partida);
+  });
+}
+
+function desenharRanking(lista) {
+  const el = $('tabela-ranking');
+  if (!lista.length) {
+    el.innerHTML = '<p class="apoio">Ninguém pontuou ainda hoje. Seja o primeiro.</p>';
+    return;
+  }
+  let h = '<table class="rank"><tbody>';
+  for (const r of lista) {
+    h +=
+      '<tr' + (r.sou ? ' class="sou"' : '') + '><td class="pos">' + r.posicao + '</td>' +
+      '<td class="nome">' + r.nome + '</td>' +
+      '<td class="jogos">' + r.partidas + 'j</td>' +
+      '<td class="pts">' + r.pontos + '</td></tr>';
+  }
+  el.innerHTML = h + '</tbody></table>';
+}
+
+// --- Mesa ------------------------------------------------------------------
+
+function abrirPartida(id) {
+  partidaId = id;
   loteJaRevelado = 0;
-  corpo.dataset.tela = 'inicio';
-};
+  lance = 0;
+  iniciarPesquisa(carregarPartida, 4000);
+}
 
-// --- Lance ----------------------------------------------------------------
+async function carregarPartida() {
+  if (!partidaId) return;
+  try {
+    const v = await api(
+      '/api/partida?id=' + encodeURIComponent(partidaId) + '&token=' + encodeURIComponent(token)
+    );
+    vistaPartida = v;
+    desenharPartida();
+  } catch (e) {
+    avisar(e.message);
+    irParaPainel();
+  }
+}
 
-function mostrarLance(v) {
-  lance = Math.max(0, Math.min(lance, v));
+function mostrarLance(max) {
+  lance = Math.max(0, Math.min(lance, max));
   $('lance-valor').textContent = lance;
   $('lance-slider').value = lance;
 }
@@ -212,24 +234,25 @@ $('lance-slider').oninput = function () {
 
 document.querySelectorAll('.ajustes button').forEach((b) => {
   b.onclick = () => {
+    const max = vistaPartida ? vistaPartida.eu.fichas : 0;
     const p = b.dataset.passo;
-    const max = visao ? visao.eu.fichas : 0;
     lance = p === 'tudo' ? max : lance + Number(p);
     mostrarLance(max);
   };
 });
 
 $('btn-lacrar').onclick = async () => {
-  if (!sessao) return;
+  if (!partidaId) return;
   $('btn-lacrar').disabled = true;
   try {
-    const d = await api('/api/lance', {
+    const v = await api('/api/lance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ codigo: sessao.codigo, token: sessao.token, valor: lance }),
+      body: JSON.stringify({ id: partidaId, token, valor: lance }),
     });
     lance = 0;
-    aplicar(d);
+    vistaPartida = v;
+    desenharPartida();
   } catch (e) {
     avisar(e.message);
   } finally {
@@ -238,42 +261,14 @@ $('btn-lacrar').onclick = async () => {
 };
 
 $('btn-seguir').onclick = () => {
-  loteJaRevelado = visao.ultimoLote ? visao.ultimoLote.lote : loteJaRevelado;
-  desenhar();
+  if (vistaPartida && vistaPartida.ultimoLote) loteJaRevelado = vistaPartida.ultimoLote.lote;
+  desenharPartida();
 };
 
-// --- Estado ---------------------------------------------------------------
-
-function iniciarPesquisa() {
-  pararPesquisa();
-  buscar();
-  pesquisa = setInterval(buscar, 3000);
-}
-function pararPesquisa() {
-  if (pesquisa) clearInterval(pesquisa);
-  pesquisa = null;
-}
-
-async function buscar() {
-  if (!sessao) return;
-  try {
-    const d = await api(
-      `/api/estado?codigo=${encodeURIComponent(sessao.codigo)}&token=${encodeURIComponent(sessao.token)}`
-    );
-    aplicar(d);
-  } catch (e) {
-    if (String(e.message).includes('não está') || String(e.message).includes('encontrada')) {
-      salvarSessao(null);
-      pararPesquisa();
-      corpo.dataset.tela = 'inicio';
-    }
-  }
-}
-
-function aplicar(d) {
-  visao = d;
-  desenhar();
-}
+$('btn-cutucar').onclick = () => {
+  const texto = 'Já lacrei meu lance no Lacre. É a sua vez:\n' + location.origin;
+  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(texto), '_blank');
+};
 
 // Reinicia a animação a cada lote: sem isso ela só rodaria na primeira vez.
 function abrirEnvelopes() {
@@ -281,41 +276,32 @@ function abrirEnvelopes() {
   const tela = document.querySelector('.tela[data-para="revelacao"]');
   palco.classList.remove('abrir');
   tela.classList.remove('revelou');
-  void palco.offsetWidth; // força o navegador a reprocessar antes de reanimar
+  void palco.offsetWidth;
   palco.classList.add('abrir');
   tela.classList.add('revelou');
 }
 
 function listaHistorico(el, h) {
-  if (!h.length) { el.innerHTML = ''; return; }
-  const itens = h
-    .map((l) => {
-      const cls = l.meu > l.dele ? 'venci' : l.meu < l.dele ? 'perdi' : '';
-      return `<li class="${cls}"><span class="rotulo">Lote ${l.lote}</span><span>${l.meu} — <b>${l.dele}</b></span></li>`;
-    })
-    .join('');
-  el.innerHTML = `<h2>Lotes revelados</h2><ul>${itens}</ul>`;
+  if (!h || !h.length) { el.innerHTML = ''; return; }
+  let s = '<h2>Lotes revelados</h2><ul>';
+  for (const l of h) {
+    const cls = l.meu > l.dele ? 'venci' : l.meu < l.dele ? 'perdi' : '';
+    s += '<li class="' + cls + '"><span class="rotulo">Lote ' + l.lote + '</span><span>' + l.meu + ' — <b>' + l.dele + '</b></span></li>';
+  }
+  el.innerHTML = s + '</ul>';
 }
 
-function desenhar() {
-  if (!visao) return;
-  const v = visao;
+function ladoHtml(j, nome) {
+  return (
+    '<div class="quem">' + nome + '</div>' +
+    '<div class="fichas">' + j.fichas + '</div>' +
+    '<div class="abaixo"><b>' + j.lotes + '</b> lote' + (j.lotes === 1 ? '' : 's') + '</div>'
+  );
+}
 
-  if (v.fase === 'aguardando') {
-    const naFila = sessao && sessao.fila;
-    $('codigo-sala').textContent = v.codigo;
-    $('codigo-sala').hidden = !!naFila;
-    $('espera-titulo').textContent = naFila ? 'Na fila' : 'Sala criada';
-    $('espera-instrucao').textContent = naFila
-      ? 'Chame mais gente: o link serve para todo mundo do grupo.'
-      : 'Mande esse código para quem vai jogar com você.';
-    $('espera-status').textContent = naFila
-      ? 'Procurando adversário…'
-      : 'Esperando o segundo jogador…';
-    $('btn-cancelar').textContent = naFila ? 'Sair da fila' : 'Cancelar sala';
-    corpo.dataset.tela = 'espera';
-    return;
-  }
+function desenharPartida() {
+  const v = vistaPartida;
+  if (!v) return;
 
   if (v.fase === 'fim') {
     const r = v.resultado || {};
@@ -325,27 +311,19 @@ function desenhar() {
     const motivos = {
       lotes: 'Decidido nos lotes.',
       fichas: 'Empate nos lotes — decidiu quem guardou mais fichas.',
-      tempo: 'Alguém estourou o banco de tempo.',
+      abandono: 'A partida acabou por prazo estourado.',
       empate: 'Mesmos lotes, mesmas fichas.',
+      'sem-adversario': 'Ninguém entrou nessa partida.',
     };
     $('fim-motivo').textContent = motivos[r.motivo] || '';
     $('fim-meus-lotes').textContent = v.eu.lotes;
     $('fim-minhas-fichas').textContent = v.eu.fichas;
-    const chamou = !!v.revanche;
-    $('revanche-aviso').hidden = !chamou;
-    if (chamou) {
-      $('revanche-aviso').textContent =
-        (v.ele ? v.ele.nome : 'Seu adversário') + ' quer jogar de novo.';
-      $('btn-revanche').textContent = 'Aceitar revanche';
-    } else {
-      $('btn-revanche').textContent = 'Jogar de novo';
-    }
     listaHistorico($('historico-fim'), v.historico);
     corpo.dataset.tela = 'fim';
+    pararPesquisa();
     return;
   }
 
-  // Revelação pendente de um lote que ainda não mostramos.
   if (v.ultimoLote && v.ultimoLote.lote > loteJaRevelado) {
     const u = v.ultimoLote;
     $('rev-lote').textContent = 'Lote ' + u.lote;
@@ -363,22 +341,22 @@ function desenhar() {
     return;
   }
 
-  // Mesa.
   $('lote-num').textContent = v.lote;
-  $('lado-eu').innerHTML = lado(v.eu, 'Você', true);
-  $('lado-ele').innerHTML = v.ele ? lado(v.ele, v.ele.nome, false) : '';
-  $('lado-ele').className = 'lado' + (v.ele && v.ele.lacrou ? '' : '');
+  $('lado-eu').innerHTML = ladoHtml(v.eu, 'Você');
+  $('lado-ele').innerHTML = v.ele ? ladoHtml(v.ele, v.ele.nome) : '';
+  $('mesa-prazo').textContent = v.eu.lacrou
+    ? 'Ele tem ' + tempoTexto(v.prazo)
+    : 'Você tem ' + tempoTexto(v.prazo) + ' neste lote';
 
   if (v.eu.lacrou) {
     $('painel-lance').hidden = true;
     $('painel-lacrado').hidden = false;
-    $('lacrado-quem').textContent = 'Esperando ' + (v.ele ? v.ele.nome : 'o outro jogador') + '.';
+    $('lacrado-quem').textContent = 'Esperando ' + (v.ele ? v.ele.nome : 'o adversário') + '.';
   } else {
     $('painel-lance').hidden = false;
     $('painel-lacrado').hidden = true;
     $('lance-slider').max = Math.max(v.eu.fichas, 1);
     mostrarLance(v.eu.fichas);
-    // A dica aparece uma vez só, no lote 1 da primeira partida da pessoa.
     const novato = !localStorage.getItem('lacre_jogou');
     $('dica-primeira').hidden = !(novato && v.lote === 1);
     if (v.lote > 1) localStorage.setItem('lacre_jogou', '1');
@@ -386,48 +364,27 @@ function desenhar() {
 
   listaHistorico($('historico'), v.historico);
   corpo.dataset.tela = 'mesa';
-  tocarRelogio();
 }
 
-function presenca(j) {
-  if (j.online === undefined) return '';
-  if (j.online) return '<span class="ponto on"></span>online';
-  if (j.vistoHa === null) return '';
-  if (j.vistoHa < 3600) return '<span class="ponto"></span>há ' + Math.max(1, Math.floor(j.vistoHa / 60)) + ' min';
-  return '<span class="ponto"></span>há ' + Math.floor(j.vistoHa / 3600) + 'h';
+// --- Consulta periódica ----------------------------------------------------
+
+function iniciarPesquisa(fn, ms) {
+  pararPesquisa();
+  fn();
+  pesquisa = setInterval(fn, ms);
+}
+function pararPesquisa() {
+  if (pesquisa) clearInterval(pesquisa);
+  pesquisa = null;
 }
 
-function lado(j, nome, eu) {
-  return (
-    `<div class="quem">${nome}</div>` +
-    `<div class="fichas">${j.fichas}</div>` +
-    `<div class="abaixo"><b>${j.lotes}</b> lote${j.lotes === 1 ? '' : 's'} · <span data-relogio>${tempoTexto(j.tempo)}</span></div>` +
-    (eu ? '' : `<div class="presenca">${presenca(j)}</div>`)
-  );
-}
+// --- Demonstração ----------------------------------------------------------
 
-// Conta o tempo localmente entre uma leitura e outra do servidor.
-function tocarRelogio() {
-  if (relogio) clearInterval(relogio);
-  relogio = setInterval(() => {
-    if (!visao || visao.fase !== 'jogando') return;
-    if (!visao.eu.lacrou && visao.eu.tempo > 0) visao.eu.tempo--;
-    if (visao.ele && !visao.ele.lacrou && visao.ele.tempo > 0) visao.ele.tempo--;
-    const els = document.querySelectorAll('[data-relogio]');
-    if (els[0]) els[0].textContent = tempoTexto(visao.eu.tempo);
-    if (els[1] && visao.ele) els[1].textContent = tempoTexto(visao.ele.tempo);
-  }, 1000);
-}
-
-// Quem chega por link vê a regra antes de entrar. Dois tipos de link:
-// ?sala=ABCD leva a uma partida específica; ?jogar=1 é o link aberto do grupo.
-// Demonstração de dez segundos. Ninguém lê tutorial de jogo, mas todo mundo
-// entende assistindo uma mão — é o jeito que se aprende truco na mesa.
 const ROTEIRO = [
   { topo: 'Lote 1 de 5', a: '?', b: '?', ganhou: null, texto: 'Cada um tem 100 fichas para os 5 lotes. Os lances são secretos.', ms: 2200 },
   { topo: 'Lote 1 de 5', a: '27', b: '19', ganhou: 'a', texto: 'Maior lance leva o lote. <b>Mas os dois pagam.</b>', ms: 2600 },
   { topo: 'Fichas restantes', a: '73', b: '81', ganhou: null, texto: 'Você levou o lote, e mesmo assim gastou mais que ele.', ms: 2400 },
-  { topo: 'Lote 2 de 5', a: '0', b: '12', ganhou: 'b', texto: 'Dar <b>0</b> é jogada: entrega o lote de graça e guarda fichas.', ms: 2600 },
+  { topo: 'Lote 2 de 5', a: '0', b: '12', ganhou: 'b', texto: 'Dar <b>0</b> é jogada: entrega o lote e guarda fichas.', ms: 2600 },
   { topo: 'Placar', a: '1', b: '1', ganhou: null, texto: 'Quem levar <b>3 lotes</b> vence a partida.', ms: 2200 },
 ];
 
@@ -437,8 +394,6 @@ function montarDemo(caixa) {
   const b = caixa.querySelector('[data-demo-b]');
   const legenda = caixa.querySelector('[data-demo-legenda]');
   let i = 0;
-  let timer = null;
-
   function passo() {
     const q = ROTEIRO[i];
     topo.textContent = q.topo;
@@ -448,31 +403,13 @@ function montarDemo(caixa) {
     b.classList.toggle('ganhou', q.ganhou === 'b');
     legenda.innerHTML = q.texto;
     i = (i + 1) % ROTEIRO.length;
-    timer = setTimeout(passo, q.ms);
+    setTimeout(passo, q.ms);
   }
   passo();
-  return () => clearTimeout(timer);
 }
-
 document.querySelectorAll('[data-demo]').forEach((el) => montarDemo(el));
 
-const params = new URLSearchParams(location.search);
-const salaDoLink = params.get('sala');
-const meuNome = nomeSalvo();
-if (meuNome) {
-  $('nome').value = meuNome;
-  $('convite-nome').value = meuNome;
-}
-if (sessao) {
-  iniciarPesquisa();
-} else if (salaDoLink && salaDoLink.length === 4) {
-  modoConvite = 'sala';
-  $('convite-codigo').textContent = salaDoLink.toUpperCase();
-  corpo.dataset.tela = 'convite';
-} else if (params.get('jogar')) {
-  modoConvite = 'fila';
-  $('convite-chamada').textContent = 'Entre na fila e jogue contra quem estiver esperando';
-  $('btn-convite-entrar').textContent = 'Jogar agora';
-  $('convite-rodape').hidden = true;
-  corpo.dataset.tela = 'convite';
-}
+// --- Partida ---------------------------------------------------------------
+
+if (meuNome) $('nome').value = meuNome;
+if (token) irParaPainel();

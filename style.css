@@ -33,8 +33,7 @@ body {
 
 .tela { display: none; }
 body[data-tela="inicio"]     .tela[data-para="inicio"],
-body[data-tela="convite"]    .tela[data-para="convite"],
-body[data-tela="espera"]     .tela[data-para="espera"],
+body[data-tela="painel"]     .tela[data-para="painel"],
 body[data-tela="mesa"]       .tela[data-para="mesa"],
 body[data-tela="revelacao"]  .tela[data-para="revelacao"],
 body[data-tela="fim"]        .tela[data-para="fim"] { display: block; }
@@ -480,3 +479,108 @@ input[type="range"]::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+
+/* --- Painel da temporada --- */
+.cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 4px 0 16px;
+  gap: 12px;
+}
+.ola { font-family: var(--display); font-size: 24px; line-height: 1.1; }
+.sub { font-size: 13px; color: var(--fraco); margin-top: 3px; }
+.mini {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 12px;
+  border: 1px solid var(--linha);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fraco);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.meta-topo { display: flex; justify-content: space-between; align-items: baseline; }
+.meta-num { font-family: var(--display); font-size: 15px; color: #6F6252; }
+.meta-num b { font-size: 30px; color: #2B2118; font-weight: 400; }
+.barra {
+  height: 8px;
+  background: #DED6C4;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 10px 0 8px;
+}
+.barra-cheia {
+  height: 100%;
+  width: 0;
+  background: var(--lacre);
+  border-radius: 4px;
+  transition: width .5s ease;
+}
+.meta-linha {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #6F6252;
+  margin-bottom: 14px;
+}
+
+.bloco { margin-top: 22px; }
+.bloco h2 {
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--fraco);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.chamada {
+  background: var(--lacre);
+  color: #FFF0EE;
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.cartoes { display: flex; flex-direction: column; gap: 8px; }
+.cartao {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font: inherit;
+  background: var(--tinta-alta);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--claro);
+  cursor: pointer;
+}
+.cartao.vez { border-color: rgba(169,50,38,.65); background: rgba(169,50,38,.14); }
+.cartao.aguardando { opacity: .6; cursor: default; }
+.cartao-nome { font-size: 15px; font-weight: 500; }
+.cartao-sub { font-size: 12px; color: var(--fraco); margin-top: 2px; }
+.cartao-acao { font-size: 12px; color: #E8938A; font-weight: 500; white-space: nowrap; }
+.cartao-espera { font-size: 12px; color: var(--fraco); white-space: nowrap; }
+
+.rank { width: 100%; border-collapse: collapse; font-size: 15px; }
+.rank td { padding: 9px 4px; border-bottom: 1px solid #DED6C4; color: #2B2118; }
+.rank tr:last-child td { border-bottom: 0; }
+.rank .pos { width: 28px; color: #8A7A66; font-size: 13px; }
+.rank .nome { font-weight: 500; }
+.rank .jogos { text-align: right; color: #8A7A66; font-size: 13px; }
+.rank .pts {
+  text-align: right;
+  width: 40px;
+  font-family: var(--display);
+  font-size: 19px;
+}
+.rank tr.sou td { background: #FBEEEC; }
+.rank tr.sou .nome::after { content: ' · você'; color: var(--lacre); font-size: 12px; font-weight: 400; }
