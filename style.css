@@ -584,3 +584,118 @@ input[type="range"]::-moz-range-thumb {
 }
 .rank tr.sou td { background: #FBEEEC; }
 .rank tr.sou .nome::after { content: ' · você'; color: var(--lacre); font-size: 12px; font-weight: 400; }
+
+/* --- Urgência: o relógio precisa gritar quando aperta --- */
+.cartao.atencao { border-color: rgba(201,162,39,.55); }
+.cartao.atencao .cartao-acao,
+.cartao.atencao .cartao-espera { color: var(--latao); font-weight: 500; }
+
+.cartao.critico {
+  border-color: rgba(169,50,38,.9);
+  background: rgba(169,50,38,.2);
+  animation: bate 1.6s ease-in-out infinite;
+}
+.cartao.critico .cartao-acao,
+.cartao.critico .cartao-espera {
+  color: #F0A79E;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes bate {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(169,50,38,0) }
+  50%      { box-shadow: 0 0 0 4px rgba(169,50,38,.28) }
+}
+
+.prazo { font-variant-numeric: tabular-nums; }
+.prazo.atencao { color: var(--latao); font-weight: 500; }
+.prazo.critico {
+  color: #F0A79E;
+  font-weight: 600;
+  animation: pisca 1.4s ease-in-out infinite;
+}
+@keyframes pisca {
+  0%, 100% { opacity: 1 }
+  50%      { opacity: .45 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartao.critico, .prazo.critico { animation: none }
+}
+
+/* Voltar precisa parecer botão, não legenda */
+.voltar {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 16px;
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  background: var(--tinta-alta);
+  color: var(--claro);
+  cursor: pointer;
+}
+.voltar:active { transform: scale(.98); }
+
+/* --- Avatar por iniciais --- */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  color: #F6F1E6;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  flex: none;
+}
+.avatar.p { width: 28px; height: 28px; font-size: 11px; }
+
+.cartao-topo { display: flex; align-items: center; gap: 9px; }
+.cartao-nome { font-size: 15px; font-weight: 500; }
+.serie { color: var(--latao); font-weight: 500; }
+
+.lado .quem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--fraco);
+  margin-bottom: 4px;
+}
+.lado .quem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank .ava { width: 34px; }
+
+/* A lição: o que de fato decidiu a partida */
+.licao {
+  background: #EDE6D6;
+  border-left: 3px solid var(--latao);
+  border-radius: 8px;
+  padding: 11px 13px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #5A4C3A;
+  text-align: left;
+  margin-top: 12px;
+}
+
+/* Subiu de posição */
+.subiu {
+  background: #DCEBDF;
+  color: #1E7A4D;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+  animation: entra .4s ease-out both;
+}
+@keyframes entra {
+  from { opacity: 0; transform: translateY(-4px) }
+  to   { opacity: 1; transform: none }
+}

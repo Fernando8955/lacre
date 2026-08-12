@@ -85,7 +85,7 @@
   <!-- MESA -->
   <section class="tela" data-para="mesa">
     <div class="cabecalho">
-      <button id="btn-voltar" class="mini">← Painel</button>
+      <button id="btn-voltar" class="voltar">← Voltar ao painel</button>
       <div class="sub" id="mesa-prazo">—</div>
     </div>
 
@@ -123,8 +123,8 @@
     <div class="papel centro" id="painel-lacrado" hidden>
       <div class="selo"><span>lacrado</span></div>
       <p class="apoio">Seu lance está no cofre. <strong id="lacrado-quem">Esperando o adversário.</strong></p>
-      <p class="apoio">Pode voltar ao painel e jogar outra partida enquanto isso.</p>
-      <button id="btn-cutucar" class="acao vazada">Avisar no WhatsApp</button>
+      <p class="apoio">Não precisa ficar aqui esperando. Se ele sumir, o prazo resolve a seu favor.</p>
+      <button id="btn-outras" class="acao">Ver outras partidas</button>
     </div>
 
     <div class="historico" id="historico"></div>
@@ -157,6 +157,7 @@
     <div class="papel centro">
       <p class="veredito grande" id="fim-titulo">—</p>
       <p class="apoio" id="fim-motivo"></p>
+      <p class="licao" id="fim-licao" hidden></p>
       <div class="dois-lances">
         <div><small>Seus lotes</small><strong id="fim-meus-lotes">0</strong></div>
         <div><small>Suas fichas</small><strong id="fim-minhas-fichas">0</strong></div>

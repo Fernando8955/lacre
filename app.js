@@ -29,6 +29,30 @@ async function api(caminho, opcoes) {
   return d;
 }
 
+
+// Avatar sem upload e sem moderação: iniciais do nome, com uma cor que é
+// sempre a mesma para o mesmo apelido. Dá cara ao adversário de graça.
+function iniciais(nome) {
+  const p = String(nome || '?').trim().split(/\s+/);
+  const a = (p[0] || '?')[0] || '?';
+  const b = p.length > 1 ? (p[p.length - 1][0] || '') : (p[0] || '')[1] || '';
+  return (a + b).toUpperCase();
+}
+function corDoNome(nome) {
+  let n = 0;
+  const s = String(nome || '');
+  for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) % 360;
+  return n;
+}
+function avatarHtml(nome, tamanho) {
+  const h = corDoNome(nome);
+  const cls = tamanho === 'p' ? 'avatar p' : 'avatar';
+  return (
+    '<span class="' + cls + '" style="background:hsl(' + h + ',42%,32%)">' +
+    iniciais(nome) + '</span>'
+  );
+}
+
 function tempoTexto(s) {
   if (s === null || s === undefined) return '';
   if (s <= 0) return 'acabou';
@@ -37,8 +61,13 @@ function tempoTexto(s) {
     const m = Math.floor((s % 3600) / 60);
     return h + 'h' + String(m).padStart(2, '0');
   }
-  const m = Math.floor(s / 60);
-  return m > 0 ? m + ' min' : s + 's';
+  // Abaixo de 15 minutos os segundos passam a aparecer: é quando importa.
+  if (s < 900) {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ':' + String(r).padStart(2, '0');
+  }
+  return Math.floor(s / 60) + ' min';
 }
 
 // --- Entrada ---------------------------------------------------------------
@@ -64,6 +93,8 @@ $('btn-entrar').onclick = async () => {
 
 $('btn-sair').onclick = () => {
   pararPesquisa();
+  prazosLocais = [];
+  atualizarTitulo();
   localStorage.removeItem('lacre_token');
   token = '';
   partidaId = null;
@@ -147,32 +178,94 @@ async function carregarPainel() {
   desenharRanking(p.ranking);
 }
 
+// O prazo desce na tela segundo a segundo. O servidor continua sendo a
+// verdade — isto é só para a pessoa sentir o tempo correndo.
+let prazosLocais = [];
+let tiquetaque = null;
+
+function nivelUrgencia(s) {
+  if (s === null || s === undefined) return 'calmo';
+  if (s <= 300) return 'critico';
+  if (s <= 900) return 'atencao';
+  return 'calmo';
+}
+
+function iniciarTiquetaque() {
+  if (tiquetaque) return;
+  tiquetaque = setInterval(() => {
+    let mudouNivel = false;
+    for (const p of prazosLocais) {
+      const antes = nivelUrgencia(p.prazo);
+      p.prazo = Math.max(0, p.prazo - 1);
+      if (nivelUrgencia(p.prazo) !== antes) mudouNivel = true;
+      const el = document.querySelector('[data-prazo="' + p.id + '"]');
+      if (el) el.textContent = p.rotulo + tempoTexto(p.prazo);
+    }
+    // Quando um cartão muda de faixa, redesenha para trocar a cor.
+    if (mudouNivel && corpo.dataset.tela === 'painel') carregarPainel();
+    atualizarTitulo();
+  }, 1000);
+}
+
+// Quem deixa a aba aberta em segundo plano vê o aviso sem voltar ao site.
+function atualizarTitulo() {
+  const n = prazosLocais.filter((p) => p.suaVez).length;
+  document.title = n ? '(' + n + ') Lacre — sua vez' : 'Lacre — leilão às cegas';
+}
+
 function desenharPartidas(lista) {
   const el = $('lista-partidas');
-  if (!lista.length) {
+  // Mais apertadas primeiro: a que está prestes a estourar não pode ficar
+  // escondida no fim da lista.
+  const ordenada = lista.slice().sort((a, b) => {
+    if (a.suaVez !== b.suaVez) return a.suaVez ? -1 : 1;
+    if (a.fase === 'aguardando') return 1;
+    if (b.fase === 'aguardando') return -1;
+    return a.prazo - b.prazo;
+  });
+
+  prazosLocais = ordenada
+    .filter((p) => p.fase !== 'aguardando')
+    .map((p) => ({
+      id: p.id,
+      prazo: p.prazo,
+      suaVez: p.suaVez,
+      rotulo: p.suaVez ? 'Sua vez · ' : 'Ele tem ',
+    }));
+  iniciarTiquetaque();
+  atualizarTitulo();
+
+  if (!ordenada.length) {
     el.innerHTML =
       '<div class="bloco"><h2>Suas partidas</h2><div class="papel centro"><p class="apoio">Nenhuma partida aberta. Toque em <b>Nova partida</b> para começar.</p></div></div>';
     return;
   }
-  const suaVez = lista.filter((p) => p.suaVez).length;
+
+  const suaVez = ordenada.filter((p) => p.suaVez).length;
   let h = '<div class="bloco"><h2>Suas partidas</h2>';
-  if (suaVez) h += '<div class="chamada">' + suaVez + (suaVez === 1 ? ' esperando o seu lance' : ' esperando o seu lance') + '</div>';
+  if (suaVez) h += '<div class="chamada">' + suaVez + ' esperando o seu lance</div>';
   h += '<div class="cartoes">';
-  for (const p of lista) {
+  for (const p of ordenada) {
     const esperando = p.fase === 'aguardando';
-    const cls = esperando ? 'cartao aguardando' : p.suaVez ? 'cartao vez' : 'cartao';
-    const quem = esperando ? 'Procurando adversário…' : p.adversario;
+    const nivel = esperando ? '' : ' ' + nivelUrgencia(p.prazo);
+    const cls = esperando ? 'cartao aguardando' : (p.suaVez ? 'cartao vez' : 'cartao') + nivel;
+    const quem = esperando
+      ? '<span class="cartao-nome">Procurando adversário…</span>'
+      : avatarHtml(p.adversario, 'p') + '<span class="cartao-nome">' + p.adversario + '</span>';
+    const serie = p.confronto && (p.confronto.v || p.confronto.d || p.confronto.e)
+      ? ' · <b class="serie">' + p.confronto.v + '—' + p.confronto.d + ' hoje</b>'
+      : '';
     const detalhe = esperando
       ? 'Você entra na partida assim que alguém aparecer'
-      : 'Lote ' + p.lote + ' · ' + p.meusLotes + ' — ' + p.lotesDele + ' · ' + p.fichas + ' fichas';
+      : 'Lote ' + p.lote + ' · ' + p.meusLotes + ' — ' + p.lotesDele + ' · ' + p.fichas + ' fichas' + serie;
+    const rotulo = p.suaVez ? 'Sua vez · ' : 'Ele tem ';
     const acao = esperando
       ? ''
-      : p.suaVez
-      ? '<div class="cartao-acao">Sua vez · ' + tempoTexto(p.prazo) + '</div>'
-      : '<div class="cartao-espera">Ele tem ' + tempoTexto(p.prazo) + '</div>';
+      : '<div class="' + (p.suaVez ? 'cartao-acao' : 'cartao-espera') + '" data-prazo="' + p.id + '">' +
+        rotulo + tempoTexto(p.prazo) + '</div>';
     h +=
       '<button class="' + cls + '" data-partida="' + p.id + '"' + (esperando ? ' disabled' : '') + '>' +
-      '<div class="cartao-txt"><div class="cartao-nome">' + quem + '</div>' +
+      '<div class="cartao-txt"><div class="cartao-topo">' + quem + '</div>' +
       '<div class="cartao-sub">' + detalhe + '</div></div>' + acao + '</button>';
   }
   el.innerHTML = h + '</div></div>';
@@ -181,16 +274,30 @@ function desenharPartidas(lista) {
   });
 }
 
+let posicaoAnterior = null;
+
 function desenharRanking(lista) {
   const el = $('tabela-ranking');
   if (!lista.length) {
     el.innerHTML = '<p class="apoio">Ninguém pontuou ainda hoje. Seja o primeiro.</p>';
     return;
   }
-  let h = '<table class="rank"><tbody>';
+  const eu = lista.find((r) => r.sou);
+  // Subir no ranking é a informação mais motivadora do produto. Ela não pode
+  // acontecer em silêncio.
+  let subiu = null;
+  if (eu && posicaoAnterior !== null && eu.posicao < posicaoAnterior) {
+    const passou = lista.find((r) => r.posicao === eu.posicao + 1);
+    subiu = passou ? 'Você passou ' + passou.nome + ' — agora é ' + eu.posicao + 'º' : 'Você subiu para ' + eu.posicao + 'º';
+  }
+  if (eu) posicaoAnterior = eu.posicao;
+
+  let h = subiu ? '<div class="subiu">' + subiu + '</div>' : '';
+  h += '<table class="rank"><tbody>';
   for (const r of lista) {
     h +=
       '<tr' + (r.sou ? ' class="sou"' : '') + '><td class="pos">' + r.posicao + '</td>' +
+      '<td class="ava">' + avatarHtml(r.nome, 'p') + '</td>' +
       '<td class="nome">' + r.nome + '</td>' +
       '<td class="jogos">' + r.partidas + 'j</td>' +
       '<td class="pts">' + r.pontos + '</td></tr>';
@@ -265,10 +372,7 @@ $('btn-seguir').onclick = () => {
   desenharPartida();
 };
 
-$('btn-cutucar').onclick = () => {
-  const texto = 'Já lacrei meu lance no Lacre. É a sua vez:\n' + location.origin;
-  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(texto), '_blank');
-};
+$('btn-outras').onclick = irParaPainel;
 
 // Reinicia a animação a cada lote: sem isso ela só rodaria na primeira vez.
 function abrirEnvelopes() {
@@ -293,7 +397,7 @@ function listaHistorico(el, h) {
 
 function ladoHtml(j, nome) {
   return (
-    '<div class="quem">' + nome + '</div>' +
+    '<div class="quem">' + avatarHtml(nome, 'p') + '<span>' + nome + '</span></div>' +
     '<div class="fichas">' + j.fichas + '</div>' +
     '<div class="abaixo"><b>' + j.lotes + '</b> lote' + (j.lotes === 1 ? '' : 's') + '</div>'
   );
@@ -316,11 +420,19 @@ function desenharPartida() {
       'sem-adversario': 'Ninguém entrou nessa partida.',
     };
     $('fim-motivo').textContent = motivos[r.motivo] || '';
+    if (r.licao) {
+      $('fim-licao').textContent = r.licao;
+      $('fim-licao').hidden = false;
+    } else {
+      $('fim-licao').hidden = true;
+    }
     $('fim-meus-lotes').textContent = v.eu.lotes;
     $('fim-minhas-fichas').textContent = v.eu.fichas;
     listaHistorico($('historico-fim'), v.historico);
     corpo.dataset.tela = 'fim';
     pararPesquisa();
+    prazosLocais = [];
+    atualizarTitulo();
     return;
   }
 
@@ -344,9 +456,15 @@ function desenharPartida() {
   $('lote-num').textContent = v.lote;
   $('lado-eu').innerHTML = ladoHtml(v.eu, 'Você');
   $('lado-ele').innerHTML = v.ele ? ladoHtml(v.ele, v.ele.nome) : '';
-  $('mesa-prazo').textContent = v.eu.lacrou
-    ? 'Ele tem ' + tempoTexto(v.prazo)
-    : 'Você tem ' + tempoTexto(v.prazo) + ' neste lote';
+  const rotuloMesa = v.eu.lacrou ? 'Ele tem ' : 'Você tem ';
+  const alvo = $('mesa-prazo');
+  alvo.textContent = rotuloMesa + tempoTexto(v.prazo);
+  alvo.className = 'sub prazo ' + nivelUrgencia(v.prazo);
+  // O mesmo tique-taque do painel cuida do relógio da mesa.
+  prazosLocais = [{ id: 'mesa', prazo: v.prazo, suaVez: !v.eu.lacrou, rotulo: rotuloMesa }];
+  alvo.setAttribute('data-prazo', 'mesa');
+  iniciarTiquetaque();
+  atualizarTitulo();
 
   if (v.eu.lacrou) {
     $('painel-lance').hidden = true;

@@ -208,6 +208,51 @@ async function lerPartida(env, id) {
 }
 
 // Contabiliza a partida encerrada no placar do dia, respeitando a cota.
+// Lê o histórico e devolve a frase que explica a partida. Perder sem saber
+// por quê é o que faz a pessoa não voltar.
+function licaoDaPartida(estado, meu) {
+  const outro = 1 - meu;
+  const h = estado.historico || [];
+  const r = estado.resultado;
+  if (!r || !h.length) return null;
+
+  const empates = h.filter((x) => x.lances[0] === x.lances[1]).length;
+  let maisApertado = null;
+  let maiorSobra = null;
+  for (const x of h) {
+    const eu = x.lances[meu];
+    const ele = x.lances[outro];
+    if (ele > eu && (maisApertado === null || ele - eu < maisApertado.dif)) {
+      maisApertado = { lote: x.lote, dif: ele - eu };
+    }
+    if (eu > ele && (maiorSobra === null || eu - ele > maiorSobra.dif)) {
+      maiorSobra = { lote: x.lote, dif: eu - ele, gasto: eu };
+    }
+  }
+
+  if (r.motivo === 'abandono') {
+    return 'A partida foi decidida no prazo: alguém deixou dois lotes vencerem.';
+  }
+  if (r.motivo === 'fichas') {
+    return r.vencedor === meu
+      ? 'Empate em lotes — você venceu porque guardou mais fichas. Economizar é jogada.'
+      : 'Empate em lotes — ele venceu por ter guardado mais fichas que você.';
+  }
+  if (empates >= 2) {
+    return 'Vocês deram o mesmo lance em ' + empates + ' lotes. Nesses, ninguém levou nada e os dois pagaram — repetir valor é o padrão mais caro do jogo.';
+  }
+  if (r.vencedor !== meu && maisApertado && maisApertado.dif <= 3) {
+    return 'Ele te cobriu por ' + maisApertado.dif + (maisApertado.dif === 1 ? ' ficha' : ' fichas') + ' no lote ' + maisApertado.lote + '. Lances redondos são fáceis de prever.';
+  }
+  if (r.vencedor === meu && maiorSobra && maiorSobra.dif >= 15) {
+    return 'Você levou o lote ' + maiorSobra.lote + ' gastando ' + maiorSobra.dif + ' fichas a mais que o necessário. Deu certo, mas foi caro.';
+  }
+  if (estado.jogadores[meu].fichas <= 0 && estado.lote >= 4) {
+    return 'Você chegou ao fim sem fichas. Gastar cedo garante lote, mas entrega os últimos de graça.';
+  }
+  return null;
+}
+
 async function contabilizar(env, estado) {
   const dia = estado.dia;
   for (let i = 0; i < estado.jogadores.length; i++) {
@@ -392,6 +437,7 @@ function visaoPartida(estado, id, meu, ts) {
           venci: estado.resultado.vencedor === meu,
           empate: estado.resultado.vencedor === -1,
           motivo: estado.resultado.motivo,
+          licao: licaoDaPartida(estado, meu),
         }
       : null,
   };
@@ -476,6 +522,32 @@ async function painel(url, env) {
     .bind(dia, token, token)
     .all();
 
+  // Confronto direto do dia: cria a sensação de série contra a mesma pessoa.
+  const encerradas = await env.DB.prepare(
+    `SELECT estado FROM partidas
+     WHERE dia = ? AND fase = 'fim' AND (jog_a = ? OR jog_b = ?)`
+  )
+    .bind(dia, token, token)
+    .all();
+
+  const confrontos = {};
+  for (const p of encerradas.results || []) {
+    let e;
+    try {
+      e = JSON.parse(p.estado);
+    } catch {
+      continue;
+    }
+    if (!e.resultado || e.jogadores.length < 2) continue;
+    const meu = e.jogadores.findIndex((j) => j.token === token);
+    if (meu < 0) continue;
+    const alvo = e.jogadores[1 - meu].token;
+    if (!confrontos[alvo]) confrontos[alvo] = { v: 0, d: 0, e: 0 };
+    if (e.resultado.vencedor === -1) confrontos[alvo].e++;
+    else if (e.resultado.vencedor === meu) confrontos[alvo].v++;
+    else confrontos[alvo].d++;
+  }
+
   const lista = [];
   for (const p of abertas.results || []) {
     const estado = JSON.parse(p.estado);
@@ -495,6 +567,7 @@ async function painel(url, env) {
       id: p.id,
       fase: estado.fase,
       adversario: ele ? ele.nome : null,
+      confronto: ele && confrontos[ele.token] ? confrontos[ele.token] : null,
       lote: estado.lote,
       meusLotes: estado.jogadores[meu].lotes,
       lotesDele: ele ? ele.lotes : 0,
