@@ -1,0 +1,317 @@
+/* Lacre — mesa de leilão à noite: madeira escura, papel, cera vermelha, latão. */
+
+:root {
+  --tinta:      #131B24;
+  --tinta-alta: #1C2733;
+  --papel:      #F4F0E6;
+  --papel-fund: #E7E1D2;
+  --lacre:      #A93226;
+  --latao:      #C9A227;
+  --claro:      #EDE8DC;
+  --fraco:      #8B99A7;
+  --linha:      rgba(237,232,220,.14);
+
+  --display: 'Fraunces', Georgia, serif;
+  --corpo: 'Inter', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--tinta);
+  color: var(--claro);
+  font-family: var(--corpo);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  padding: 20px 16px 60px;
+  min-height: 100vh;
+}
+
+.palco { max-width: 460px; margin: 0 auto; }
+
+.tela { display: none; }
+body[data-tela="inicio"]     .tela[data-para="inicio"],
+body[data-tela="espera"]     .tela[data-para="espera"],
+body[data-tela="mesa"]       .tela[data-para="mesa"],
+body[data-tela="revelacao"]  .tela[data-para="revelacao"],
+body[data-tela="fim"]        .tela[data-para="fim"] { display: block; }
+
+/* Marca */
+.marca { text-align: center; margin: 24px 0 28px; }
+.marca h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 46px;
+  letter-spacing: -.02em;
+  line-height: 1;
+}
+.marca h1::after {
+  content: '';
+  display: block;
+  width: 34px; height: 3px;
+  background: var(--lacre);
+  margin: 14px auto 0;
+  border-radius: 2px;
+}
+.marca p { color: var(--fraco); font-size: 15px; margin-top: 12px; }
+
+/* Cartão de papel */
+.papel {
+  background: var(--papel);
+  color: #2B2118;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 1px 0 var(--papel-fund) inset;
+}
+.papel.centro { text-align: center; }
+.papel + .papel { margin-top: 14px; }
+
+.sobrescrito {
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #8A7A66;
+  font-weight: 500;
+}
+.apoio { font-size: 14px; color: #6F6252; margin-top: 12px; }
+.apoio strong { color: #2B2118; font-weight: 600; }
+
+/* Campos */
+.campo { display: block; border: 0; margin-bottom: 16px; }
+.campo > span, .campo legend {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6F6252;
+  margin-bottom: 6px;
+}
+input[type="text"] {
+  width: 100%;
+  font: inherit;
+  font-size: 17px;
+  padding: 13px 14px;
+  border: 1.5px solid #D8D0BE;
+  border-radius: 10px;
+  background: #FBF9F4;
+  color: #2B2118;
+}
+input[type="text"]:focus { outline: 2px solid var(--lacre); outline-offset: 1px; border-color: transparent; }
+.codigo-input {
+  text-transform: uppercase;
+  letter-spacing: .32em;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 26px;
+}
+
+.opcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.opcoes label { position: relative; display: block; cursor: pointer; }
+.opcoes input { position: absolute; opacity: 0; }
+.opcoes span {
+  display: block;
+  padding: 11px 10px;
+  border: 1.5px solid #D8D0BE;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+.opcoes small { display: block; font-weight: 400; font-size: 12px; color: #8A7A66; }
+.opcoes input:checked + span { border-color: var(--lacre); background: #FBEEEC; }
+.opcoes input:focus-visible + span { outline: 2px solid var(--lacre); outline-offset: 2px; }
+
+/* Botões */
+.acao {
+  width: 100%;
+  font: inherit;
+  font-weight: 600;
+  font-size: 17px;
+  padding: 15px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--lacre);
+  color: #FFF6F4;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.acao:active { transform: scale(.99); }
+.acao.vazada { background: transparent; color: #2B2118; border: 1.5px solid #D8D0BE; }
+.acao:disabled { opacity: .45; cursor: default; }
+
+.divisor { display: flex; align-items: center; gap: 12px; margin: 22px 0 16px; }
+.divisor::before, .divisor::after { content: ''; flex: 1; height: 1px; background: #DED6C4; }
+.divisor span { font-size: 12px; color: #8A7A66; }
+
+.regra-curta {
+  color: var(--fraco);
+  font-size: 14px;
+  line-height: 1.65;
+  margin-top: 22px;
+  text-align: center;
+}
+
+/* Código da sala */
+.codigo-grande {
+  font-family: var(--display);
+  font-size: 62px;
+  letter-spacing: .16em;
+  line-height: 1.1;
+  margin: 8px 0 4px;
+  color: var(--lacre);
+}
+.pulsando { animation: respira 2.4s ease-in-out infinite; }
+@keyframes respira { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
+
+/* Placar da mesa */
+.placar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.lado {
+  background: var(--tinta-alta);
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.lado .quem { font-size: 12px; color: var(--fraco); }
+.lado .fichas { font-family: var(--display); font-size: 27px; line-height: 1.15; }
+.lado .abaixo { font-size: 12px; color: var(--fraco); }
+.lado .abaixo b { color: var(--latao); font-weight: 500; }
+.lado.baixo .abaixo b { color: var(--lacre); }
+.lote-atual { text-align: center; color: var(--fraco); }
+.lote-atual span { display: block; font-family: var(--display); font-size: 26px; color: var(--claro); }
+.lote-atual small { font-size: 11px; }
+
+/* Envelope do lance */
+.envelope { text-align: center; }
+.lance-numero {
+  font-family: var(--display);
+  font-size: 68px;
+  line-height: 1.05;
+  margin: 2px 0 10px;
+}
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  margin: 6px 0 14px;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 5px; background: #DED6C4; border-radius: 3px; }
+input[type="range"]::-moz-range-track { height: 5px; background: #DED6C4; border-radius: 3px; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 30px; height: 30px;
+  margin-top: -13px;
+  border-radius: 50%;
+  background: var(--lacre);
+  border: 3px solid var(--papel);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--lacre);
+  border: 3px solid var(--papel);
+}
+
+.ajustes { display: flex; gap: 6px; margin-bottom: 14px; }
+.ajustes button {
+  flex: 1;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 2px;
+  border: 1.5px solid #D8D0BE;
+  border-radius: 9px;
+  background: #FBF9F4;
+  color: #2B2118;
+  cursor: pointer;
+}
+.ajustes button:active { background: #EFE9DA; }
+
+/* Selo de cera — o momento assinatura */
+.selo {
+  width: 108px; height: 108px;
+  margin: 6px auto 14px;
+  border-radius: 50%;
+  background: var(--lacre);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 6px rgba(169,50,38,.16);
+  animation: carimba .45s cubic-bezier(.2,1.4,.4,1) both;
+}
+.selo span {
+  font-family: var(--display);
+  font-size: 17px;
+  color: #FFF0EE;
+  letter-spacing: .08em;
+  text-transform: lowercase;
+}
+@keyframes carimba {
+  from { transform: scale(1.7) rotate(-9deg); opacity: 0 }
+  to   { transform: scale(1) rotate(-4deg); opacity: 1 }
+}
+
+/* Revelação */
+.veredito {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 8px 0 4px;
+}
+.veredito.grande { font-size: 36px; }
+.veredito.ganhei { color: #1E7A4D; }
+.veredito.perdi { color: var(--lacre); }
+.dois-lances {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0 4px;
+}
+.dois-lances div { background: #EDE6D6; border-radius: 10px; padding: 12px 8px; }
+.dois-lances small { display: block; font-size: 12px; color: #6F6252; }
+.dois-lances strong { font-family: var(--display); font-size: 30px; font-weight: 400; }
+
+/* Histórico */
+.historico { margin-top: 20px; }
+.historico h2 {
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--fraco);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.historico ul { list-style: none; background: var(--tinta-alta); border-radius: 12px; padding: 4px 14px; }
+.historico li {
+  display: flex;
+  justify-content: space-between;
+  padding: 11px 0;
+  font-size: 15px;
+  border-bottom: 1px solid var(--linha);
+}
+.historico li:last-child { border-bottom: 0; }
+.historico .rotulo { color: var(--fraco); }
+.historico .venci b { color: var(--latao); }
+.historico .perdi b { color: var(--lacre); }
+
+.aviso {
+  position: sticky;
+  bottom: 12px;
+  max-width: 460px;
+  margin: 16px auto 0;
+  background: var(--lacre);
+  color: #FFF6F4;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
