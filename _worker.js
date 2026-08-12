@@ -43,16 +43,18 @@ async function gravarSala(db, codigo, estado) {
     .run();
 }
 
-function novoEstado(banco) {
+function novoEstado(banco, aberta) {
   return {
     fase: 'aguardando',
     banco,
+    aberta: aberta ? 1 : 0,
     lote: 1,
     loteAbertoEm: null,
     jogadores: [],
     lances: [null, null],
     historico: [],
     resultado: null,
+    revanche: null,
   };
 }
 function novoJogador(nome) {
@@ -62,7 +64,18 @@ function novoJogador(nome) {
     fichas: FICHAS_INICIAIS,
     lotes: 0,
     tempo: null,
+    visto: Date.now(),
   };
+}
+
+// Marca presença. Só grava se passou tempo suficiente, para não escrever
+// no banco a cada 3 segundos de consulta.
+function marcarVisto(estado, i, ts) {
+  const j = estado.jogadores[i];
+  if (!j) return false;
+  if (j.visto && ts - j.visto < 15000) return false;
+  j.visto = ts;
+  return true;
 }
 
 function decorrido(estado, ts) {
@@ -146,6 +159,8 @@ function visao(estado, codigo, meuIndice, ts) {
           lotes: ele.lotes,
           tempo: tempoRestante(estado, outro, ts),
           lacrou: estado.lances[outro] !== null,
+          online: ele.visto ? ts - ele.visto < 45000 : false,
+          vistoHa: ele.visto ? Math.floor((ts - ele.visto) / 1000) : null,
         }
       : null,
     ultimoLote: ultimo
@@ -157,6 +172,7 @@ function visao(estado, codigo, meuIndice, ts) {
       dele: h.lances[outro],
     })),
     revelado: estado.lances[0] !== null && estado.lances[1] !== null,
+    revanche: estado.revanche || null,
     resultado: estado.resultado
       ? {
           venci: estado.resultado.vencedor === meuIndice,
@@ -227,6 +243,157 @@ async function entrarSala(request, env) {
   return json({ codigo, token: jogador.token });
 }
 
+// Fila aberta: um link só para o grupo inteiro. Quem chega ou é emparelhado
+// com alguém que já está esperando, ou vira o próximo da fila.
+async function entrarNaFila(request, env) {
+  let corpo;
+  try {
+    corpo = await request.json();
+  } catch {
+    return erro('Corpo inválido');
+  }
+  const banco = BANCOS[corpo.banco] || BANCOS.diario;
+  const ts = agora();
+  const limite = ts - 30 * 60 * 1000; // salas paradas há mais de 30 min não valem
+
+  // Tenta entrar numa sala que já está esperando alguém.
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const linha = await env.DB.prepare(
+      `SELECT codigo, estado FROM salas
+       WHERE json_extract(estado, '$.aberta') = 1
+         AND json_extract(estado, '$.fase') = 'aguardando'
+         AND criada_em > ?
+       ORDER BY criada_em ASC LIMIT 1`
+    )
+      .bind(limite)
+      .first();
+
+    if (!linha) break;
+
+    const estado = JSON.parse(linha.estado);
+    if (estado.jogadores.length >= 2) continue; // alguém pegou antes, tenta de novo
+
+    const jogador = novoJogador(corpo.nome);
+    estado.jogadores.push(jogador);
+    estado.fase = 'jogando';
+    estado.loteAbertoEm = ts;
+    estado.jogadores[0].tempo = estado.banco;
+    estado.jogadores[1].tempo = estado.banco;
+
+    // Só ocupa a vaga se a sala continuar aguardando neste instante.
+    const r = await env.DB.prepare(
+      `UPDATE salas SET estado = ?, atualizada_em = ?
+       WHERE codigo = ? AND json_extract(estado, '$.fase') = 'aguardando'`
+    )
+      .bind(JSON.stringify(estado), ts, linha.codigo)
+      .run();
+
+    const mudou = r && r.meta && r.meta.changes;
+    if (mudou) return json({ codigo: linha.codigo, token: jogador.token, pareado: true });
+  }
+
+  // Ninguém esperando: cria a sala e fica na fila.
+  const estado = novoEstado(banco, true);
+  const jogador = novoJogador(corpo.nome);
+  estado.jogadores.push(jogador);
+
+  for (let t = 0; t < 6; t++) {
+    const codigo = gerarCodigo();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO salas (codigo, estado, criada_em, atualizada_em) VALUES (?, ?, ?, ?)'
+      )
+        .bind(codigo, JSON.stringify(estado), ts, ts)
+        .run();
+      return json({ codigo, token: jogador.token, pareado: false });
+    } catch (e) {
+      if (!String(e).includes('UNIQUE')) throw e;
+    }
+  }
+  return erro('Não foi possível entrar na fila. Tente de novo.', 500);
+}
+
+// Revanche. O mesmo endpoint serve para quem chama e para quem aceita:
+// se já existe uma revanche marcada, a pessoa entra nela.
+async function revanche(request, env) {
+  let corpo;
+  try {
+    corpo = await request.json();
+  } catch {
+    return erro('Corpo inválido');
+  }
+  const codigo = String(corpo.codigo || '').trim().toUpperCase();
+  const token = String(corpo.token || '');
+
+  const sala = await lerSala(env.DB, codigo);
+  if (!sala) return erro('Sala não encontrada', 404);
+  const estado = sala.estado;
+  const i = acharJogador(estado, token);
+  if (i < 0) return erro('Você não está nessa sala', 403);
+  if (estado.fase !== 'fim') return erro('A partida ainda não acabou');
+
+  const nome = estado.jogadores[i].nome;
+  const ts = agora();
+
+  // Alguém já chamou: entra na sala da revanche.
+  if (estado.revanche) {
+    const nova = await lerSala(env.DB, estado.revanche);
+    if (!nova) return erro('A revanche não está mais disponível', 404);
+    const e2 = nova.estado;
+    if (e2.jogadores.length >= 2) return erro('A revanche já começou');
+
+    const j = novoJogador(nome);
+    e2.jogadores.push(j);
+    e2.fase = 'jogando';
+    e2.loteAbertoEm = ts;
+    e2.jogadores[0].tempo = e2.banco;
+    e2.jogadores[1].tempo = e2.banco;
+    await gravarSala(env.DB, estado.revanche, e2);
+    return json({ codigo: estado.revanche, token: j.token, aceitou: true });
+  }
+
+  // Ninguém chamou ainda: cria a sala nova e marca na antiga.
+  const e2 = novoEstado(estado.banco, false);
+  const j = novoJogador(nome);
+  e2.jogadores.push(j);
+
+  for (let t = 0; t < 6; t++) {
+    const novoCodigo = gerarCodigo();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO salas (codigo, estado, criada_em, atualizada_em) VALUES (?, ?, ?, ?)'
+      )
+        .bind(novoCodigo, JSON.stringify(e2), ts, ts)
+        .run();
+
+      // Só marca se o outro não marcou primeiro.
+      estado.revanche = novoCodigo;
+      const r = await env.DB.prepare(
+        `UPDATE salas SET estado = ?, atualizada_em = ?
+         WHERE codigo = ? AND json_extract(estado, '$.revanche') IS NULL`
+      )
+        .bind(JSON.stringify(estado), ts, codigo)
+        .run();
+
+      if (r && r.meta && r.meta.changes) {
+        return json({ codigo: novoCodigo, token: j.token, aceitou: false });
+      }
+      // O outro chamou no mesmo instante: entra na dele.
+      return await revanche(
+        new Request(request.url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ codigo, token }),
+        }),
+        env
+      );
+    } catch (e) {
+      if (!String(e).includes('UNIQUE')) throw e;
+    }
+  }
+  return erro('Não foi possível criar a revanche.', 500);
+}
+
 async function lerEstado(url, env) {
   const codigo = String(url.searchParams.get('codigo') || '').trim().toUpperCase();
   const token = String(url.searchParams.get('token') || '');
@@ -238,7 +405,8 @@ async function lerEstado(url, env) {
   if (i < 0) return erro('Você não está nessa sala', 403);
 
   const ts = agora();
-  if (aplicarRelogio(estado, ts)) await gravarSala(env.DB, codigo, estado);
+  const mudouVisto = marcarVisto(estado, i, ts);
+  if (aplicarRelogio(estado, ts) || mudouVisto) await gravarSala(env.DB, codigo, estado);
   return json(visao(estado, codigo, i, ts));
 }
 
@@ -273,6 +441,7 @@ async function darLance(request, env) {
   if (valor > estado.jogadores[i].fichas) return erro('Você não tem essas fichas');
 
   estado.jogadores[i].tempo = Math.max(0, tempoRestante(estado, i, ts));
+  estado.jogadores[i].visto = ts;
   estado.lances[i] = valor;
 
   if (estado.lances[0] !== null && estado.lances[1] !== null) resolverLote(estado, ts);
@@ -295,6 +464,12 @@ export default {
         }
         if (url.pathname === '/api/entrar' && request.method === 'POST') {
           return await entrarSala(request, env);
+        }
+        if (url.pathname === '/api/fila' && request.method === 'POST') {
+          return await entrarNaFila(request, env);
+        }
+        if (url.pathname === '/api/revanche' && request.method === 'POST') {
+          return await revanche(request, env);
         }
         if (url.pathname === '/api/estado' && request.method === 'GET') {
           return await lerEstado(url, env);

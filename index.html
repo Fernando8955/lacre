@@ -36,9 +36,14 @@
         </div>
       </fieldset>
 
-      <button id="btn-criar" class="acao">Criar sala</button>
+      <button id="btn-fila" class="acao">Jogar agora</button>
+      <p class="apoio centro">Você é emparelhado com quem estiver na fila.</p>
 
-      <div class="divisor"><span>ou entre numa sala</span></div>
+      <div class="divisor"><span>ou jogue com quem você escolher</span></div>
+
+      <button id="btn-criar" class="acao vazada">Criar sala privada</button>
+
+      <div class="divisor"><span>ou entre com um código</span></div>
 
       <label class="campo">
         <span>Código da sala</span>
@@ -50,14 +55,42 @@
     <p class="regra-curta">Cada um dá um lance secreto por lote. Quem der o maior leva o lote — e os dois pagam o que ofereceram. Quem levar três lotes vence.</p>
   </section>
 
+  <!-- CONVITE (quem chega pelo link) -->
+  <section class="tela" data-para="convite">
+    <header class="marca">
+      <h1>Lacre</h1>
+      <p id="convite-chamada">Você foi convidado para uma partida</p>
+    </header>
+
+    <div class="papel">
+      <p class="sobrescrito">Como funciona</p>
+      <ol class="regras">
+        <li>Você tem <b>100 fichas</b> para os <b>5 lotes</b> da partida.</li>
+        <li>Em cada lote os dois dão um lance <b>secreto e ao mesmo tempo</b>.</li>
+        <li>Quem der o maior lance leva o lote — <b>mas os dois pagam</b> o que ofereceram.</li>
+        <li>Quem levar <b>3 lotes</b> vence. Empatou em lotes? Ganha quem guardou mais fichas.</li>
+      </ol>
+      <p class="apoio">Dar <b>0</b> é jogada válida: você entrega o lote de graça e chega mais rico no fim. Gastar tudo cedo garante um lote e te deixa sem nada depois.</p>
+    </div>
+
+    <div class="papel">
+      <label class="campo">
+        <span>Seu nome</span>
+        <input id="convite-nome" type="text" maxlength="16" placeholder="Seu nome" autocomplete="nickname">
+      </label>
+      <button id="btn-convite-entrar" class="acao">Entrar na partida</button>
+      <p class="apoio centro" id="convite-rodape">Sala <b id="convite-codigo">----</b></p>
+    </div>
+  </section>
+
   <!-- ESPERA -->
   <section class="tela" data-para="espera">
     <div class="papel centro">
-      <p class="sobrescrito">Sala criada</p>
+      <p class="sobrescrito" id="espera-titulo">Sala criada</p>
       <p class="codigo-grande" id="codigo-sala">----</p>
-      <p class="apoio">Mande esse código para quem vai jogar com você.</p>
+      <p class="apoio" id="espera-instrucao">Mande esse código para quem vai jogar com você.</p>
       <button id="btn-copiar" class="acao">Copiar convite</button>
-      <p class="apoio pulsando">Esperando o segundo jogador…</p>
+      <p class="apoio pulsando" id="espera-status">Esperando o segundo jogador…</p>
       <button id="btn-cancelar" class="acao vazada">Cancelar sala</button>
     </div>
   </section>
@@ -83,12 +116,22 @@
       </div>
       <button id="btn-lacrar" class="acao">Lacrar lance</button>
       <p class="apoio">Ninguém vê esse número até os dois lacrarem.</p>
+      <details class="lembrete">
+        <summary>Como funciona</summary>
+        <ol class="regras">
+          <li>Maior lance leva o lote, <b>mas os dois pagam</b>.</li>
+          <li>Quem levar <b>3 dos 5 lotes</b> vence.</li>
+          <li>Empate em lotes decide por <b>fichas guardadas</b>.</li>
+          <li>Dar <b>0</b> vale: entrega o lote e guarda fichas.</li>
+        </ol>
+      </details>
     </div>
 
     <div class="papel centro" id="painel-lacrado" hidden>
       <div class="selo"><span>lacrado</span></div>
       <p class="apoio">Seu lance está no cofre. <strong id="lacrado-quem">Esperando o outro jogador.</strong></p>
       <p class="apoio">Pode fechar a página. O relógio dele continua correndo.</p>
+      <button id="btn-cutucar" class="acao vazada">Avisar no WhatsApp</button>
     </div>
 
     <div class="historico" id="historico"></div>
@@ -117,7 +160,9 @@
         <div><small>Seus lotes</small><strong id="fim-meus-lotes">0</strong></div>
         <div><small>Suas fichas</small><strong id="fim-minhas-fichas">0</strong></div>
       </div>
-      <button id="btn-novo" class="acao">Nova partida</button>
+      <p class="apoio" id="revanche-aviso" hidden></p>
+      <button id="btn-revanche" class="acao">Jogar de novo</button>
+      <button id="btn-novo" class="acao vazada">Sair</button>
     </div>
     <div class="historico" id="historico-fim"></div>
   </section>

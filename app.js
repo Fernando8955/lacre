@@ -23,6 +23,21 @@ function salvarSessao(s) {
   else localStorage.removeItem('lacre');
 }
 
+// O apelido fica guardado à parte da sessão: é o que faz a pessoa não
+// precisar se apresentar de novo a cada partida, sem exigir cadastro.
+function lembrarNome(n) {
+  const limpo = String(n || '').trim();
+  if (limpo) localStorage.setItem('lacre_nome', limpo);
+  return limpo;
+}
+function nomeSalvo() {
+  try {
+    return localStorage.getItem('lacre_nome') || '';
+  } catch {
+    return '';
+  }
+}
+
 function avisar(msg) {
   const el = $('aviso');
   if (!msg) { el.hidden = true; return; }
@@ -54,7 +69,7 @@ $('btn-criar').onclick = async () => {
     const d = await api('/api/sala', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ nome: $('nome').value, banco }),
+      body: JSON.stringify({ nome: lembrarNome($('nome').value), banco }),
     });
     salvarSessao({ codigo: d.codigo, token: d.token });
     $('codigo-sala').textContent = d.codigo;
@@ -65,24 +80,71 @@ $('btn-criar').onclick = async () => {
   }
 };
 
+let modoConvite = 'sala';
+
+async function entrarNaFila(nome) {
+  const d = await api('/api/fila', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nome: lembrarNome(nome), banco: 'rapido' }),
+  });
+  salvarSessao({ codigo: d.codigo, token: d.token, fila: true });
+  history.replaceState(null, '', location.pathname);
+  iniciarPesquisa();
+}
+
+$('btn-fila').onclick = async () => {
+  try {
+    await entrarNaFila($('nome').value);
+  } catch (e) {
+    avisar(e.message);
+  }
+};
+
+async function entrarNaSala(codigo, nome) {
+  const d = await api('/api/entrar', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ codigo, nome: lembrarNome(nome) }),
+  });
+  salvarSessao({ codigo: d.codigo, token: d.token });
+  // Tira o ?sala= da barra de endereço para o refresh não voltar ao convite.
+  history.replaceState(null, '', location.pathname);
+  iniciarPesquisa();
+}
+
 $('btn-entrar').onclick = async () => {
   const codigo = $('codigo').value.trim().toUpperCase();
   if (codigo.length !== 4) return avisar('O código tem 4 letras.');
   try {
-    const d = await api('/api/entrar', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ codigo, nome: $('nome').value }),
-    });
-    salvarSessao({ codigo: d.codigo, token: d.token });
-    iniciarPesquisa();
+    await entrarNaSala(codigo, $('nome').value);
+  } catch (e) {
+    avisar(e.message);
+  }
+};
+
+$('btn-convite-entrar').onclick = async () => {
+  try {
+    if (modoConvite === 'fila') {
+      await entrarNaFila($('convite-nome').value);
+    } else {
+      const codigo = $('convite-codigo').textContent.trim().toUpperCase();
+      await entrarNaSala(codigo, $('convite-nome').value);
+    }
   } catch (e) {
     avisar(e.message);
   }
 };
 
 $('btn-copiar').onclick = async () => {
-  const texto = `Bora jogar Lacre? Código da sala: ${sessao.codigo}\n${location.origin}`;
+  // Numa sala privada o link leva à sala. Na fila, o link é aberto:
+  // pode ser jogado no grupo e serve para todo mundo.
+  const link = sessao.fila
+    ? `${location.origin}/?jogar=1`
+    : `${location.origin}/?sala=${sessao.codigo}`;
+  const texto = sessao.fila
+    ? `Partida de Lacre valendo. Clica e entra na fila — leva 2 minutos:\n${link}`
+    : `Te chamei pra uma partida de Lacre. É rápido, cinco lotes:\n${link}`;
   try {
     if (navigator.share) await navigator.share({ text: texto });
     else { await navigator.clipboard.writeText(texto); avisar('Convite copiado.'); }
@@ -97,6 +159,34 @@ $('btn-cancelar').onclick = () => {
   visao = null;
   loteJaRevelado = 0;
   corpo.dataset.tela = 'inicio';
+};
+
+$('btn-revanche').onclick = async () => {
+  if (!sessao) return;
+  $('btn-revanche').disabled = true;
+  try {
+    const d = await api('/api/revanche', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ codigo: sessao.codigo, token: sessao.token }),
+    });
+    loteJaRevelado = 0;
+    salvarSessao({ codigo: d.codigo, token: d.token, fila: false });
+    iniciarPesquisa();
+  } catch (e) {
+    avisar(e.message);
+  } finally {
+    $('btn-revanche').disabled = false;
+  }
+};
+
+// Notificação pobre e eficaz: abre o WhatsApp com a mensagem pronta.
+// Funciona em qualquer aparelho e não depende de permissão de push.
+$('btn-cutucar').onclick = () => {
+  if (!sessao) return;
+  const link = `${location.origin}/?sala=${sessao.codigo}`;
+  const texto = `Já lacrei meu lance no Lacre. É a sua vez:\n${link}`;
+  window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(texto), '_blank');
 };
 
 $('btn-novo').onclick = () => {
@@ -182,7 +272,6 @@ async function buscar() {
 
 function aplicar(d) {
   visao = d;
-  if (d.fase === 'fim') pararPesquisa();
   desenhar();
 }
 
@@ -202,7 +291,17 @@ function desenhar() {
   const v = visao;
 
   if (v.fase === 'aguardando') {
+    const naFila = sessao && sessao.fila;
     $('codigo-sala').textContent = v.codigo;
+    $('codigo-sala').hidden = !!naFila;
+    $('espera-titulo').textContent = naFila ? 'Na fila' : 'Sala criada';
+    $('espera-instrucao').textContent = naFila
+      ? 'Chame mais gente: o link serve para todo mundo do grupo.'
+      : 'Mande esse código para quem vai jogar com você.';
+    $('espera-status').textContent = naFila
+      ? 'Procurando adversário…'
+      : 'Esperando o segundo jogador…';
+    $('btn-cancelar').textContent = naFila ? 'Sair da fila' : 'Cancelar sala';
     corpo.dataset.tela = 'espera';
     return;
   }
@@ -221,6 +320,15 @@ function desenhar() {
     $('fim-motivo').textContent = motivos[r.motivo] || '';
     $('fim-meus-lotes').textContent = v.eu.lotes;
     $('fim-minhas-fichas').textContent = v.eu.fichas;
+    const chamou = !!v.revanche;
+    $('revanche-aviso').hidden = !chamou;
+    if (chamou) {
+      $('revanche-aviso').textContent =
+        (v.ele ? v.ele.nome : 'Seu adversário') + ' quer jogar de novo.';
+      $('btn-revanche').textContent = 'Aceitar revanche';
+    } else {
+      $('btn-revanche').textContent = 'Jogar de novo';
+    }
     listaHistorico($('historico-fim'), v.historico);
     corpo.dataset.tela = 'fim';
     return;
@@ -243,8 +351,8 @@ function desenhar() {
 
   // Mesa.
   $('lote-num').textContent = v.lote;
-  $('lado-eu').innerHTML = lado(v.eu, 'Você');
-  $('lado-ele').innerHTML = v.ele ? lado(v.ele, v.ele.nome) : '';
+  $('lado-eu').innerHTML = lado(v.eu, 'Você', true);
+  $('lado-ele').innerHTML = v.ele ? lado(v.ele, v.ele.nome, false) : '';
   $('lado-ele').className = 'lado' + (v.ele && v.ele.lacrou ? '' : '');
 
   if (v.eu.lacrou) {
@@ -263,11 +371,20 @@ function desenhar() {
   tocarRelogio();
 }
 
-function lado(j, nome) {
+function presenca(j) {
+  if (j.online === undefined) return '';
+  if (j.online) return '<span class="ponto on"></span>online';
+  if (j.vistoHa === null) return '';
+  if (j.vistoHa < 3600) return '<span class="ponto"></span>há ' + Math.max(1, Math.floor(j.vistoHa / 60)) + ' min';
+  return '<span class="ponto"></span>há ' + Math.floor(j.vistoHa / 3600) + 'h';
+}
+
+function lado(j, nome, eu) {
   return (
     `<div class="quem">${nome}</div>` +
     `<div class="fichas">${j.fichas}</div>` +
-    `<div class="abaixo"><b>${j.lotes}</b> lote${j.lotes === 1 ? '' : 's'} · <span data-relogio>${tempoTexto(j.tempo)}</span></div>`
+    `<div class="abaixo"><b>${j.lotes}</b> lote${j.lotes === 1 ? '' : 's'} · <span data-relogio>${tempoTexto(j.tempo)}</span></div>` +
+    (eu ? '' : `<div class="presenca">${presenca(j)}</div>`)
   );
 }
 
@@ -284,5 +401,25 @@ function tocarRelogio() {
   }, 1000);
 }
 
-// Retoma a partida se a pessoa fechou e voltou.
-if (sessao) iniciarPesquisa();
+// Quem chega por link vê a regra antes de entrar. Dois tipos de link:
+// ?sala=ABCD leva a uma partida específica; ?jogar=1 é o link aberto do grupo.
+const params = new URLSearchParams(location.search);
+const salaDoLink = params.get('sala');
+const meuNome = nomeSalvo();
+if (meuNome) {
+  $('nome').value = meuNome;
+  $('convite-nome').value = meuNome;
+}
+if (sessao) {
+  iniciarPesquisa();
+} else if (salaDoLink && salaDoLink.length === 4) {
+  modoConvite = 'sala';
+  $('convite-codigo').textContent = salaDoLink.toUpperCase();
+  corpo.dataset.tela = 'convite';
+} else if (params.get('jogar')) {
+  modoConvite = 'fila';
+  $('convite-chamada').textContent = 'Entre na fila e jogue contra quem estiver esperando';
+  $('btn-convite-entrar').textContent = 'Jogar agora';
+  $('convite-rodape').hidden = true;
+  corpo.dataset.tela = 'convite';
+}
