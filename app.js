@@ -89,6 +89,16 @@ $('btn-copiar').onclick = async () => {
   } catch { /* usuário cancelou */ }
 };
 
+// Sair da sala de espera. Precisa limpar a sessão salva, senão o app
+// devolve a pessoa para a mesma sala travada quando ela voltar.
+$('btn-cancelar').onclick = () => {
+  salvarSessao(null);
+  pararPesquisa();
+  visao = null;
+  loteJaRevelado = 0;
+  corpo.dataset.tela = 'inicio';
+};
+
 $('btn-novo').onclick = () => {
   salvarSessao(null);
   pararPesquisa();
