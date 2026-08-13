@@ -174,6 +174,7 @@ async function carregarPainel() {
     p.eu.pontos + (p.eu.pontos === 1 ? ' ponto' : ' pontos') + ' · ' + p.eu.vitorias + ' vitórias';
   $('meta-posicao').textContent = p.eu.posicao ? p.eu.posicao + 'º lugar' : 'sem posição ainda';
 
+  desenharOntem(p.ontem);
   desenharPartidas(p.partidas);
   desenharRanking(p.ranking);
 }
@@ -272,6 +273,48 @@ function desenharPartidas(lista) {
   el.querySelectorAll('[data-partida]').forEach((b) => {
     b.onclick = () => abrirPartida(b.dataset.partida);
   });
+}
+
+// Fecho da temporada anterior. Some depois que a pessoa dispensa, para não
+// competir com o dia de hoje.
+function desenharOntem(o) {
+  const el = $('fecho-ontem');
+  if (!o || localStorage.getItem('lacre_viu_ontem') === o.dia) {
+    el.innerHTML = '';
+    return;
+  }
+  const medalhas = ['1º', '2º', '3º'];
+  let h = '<div class="papel ontem"><div class="ontem-topo">' +
+    '<span class="sobrescrito">Como terminou ontem</span>' +
+    '<button class="fechar" id="btn-fecha-ontem" aria-label="Fechar">×</button></div>';
+
+  h += '<div class="podio">';
+  for (const p of o.podio) {
+    h += '<div class="podio-linha' + (p.sou ? ' sou' : '') + '">' +
+      '<span class="podio-pos">' + medalhas[p.posicao - 1] + '</span>' +
+      avatarHtml(p.nome, 'p') +
+      '<span class="podio-nome">' + p.nome + '</span>' +
+      '<span class="podio-pts">' + p.pontos + '</span></div>';
+  }
+  h += '</div>';
+
+  if (o.minhaPosicao) {
+    const campeao = o.podio[0] && o.podio[0].sou;
+    h += '<p class="apoio ontem-eu">' +
+      (campeao
+        ? 'Você foi o campeão de ontem, com ' + o.meusPontos + ' pontos em ' + o.minhasPartidas + ' partidas.'
+        : 'Você terminou em ' + o.minhaPosicao + 'º de ' + o.total + ', com ' + o.meusPontos + ' pontos em ' + o.minhasPartidas + ' partidas.') +
+      '</p>';
+  } else {
+    h += '<p class="apoio ontem-eu">Você não pontuou ontem. Hoje o placar está zerado para todo mundo.</p>';
+  }
+
+  el.innerHTML = h + '</div>';
+  const b = $('btn-fecha-ontem');
+  if (b) b.onclick = () => {
+    localStorage.setItem('lacre_viu_ontem', o.dia);
+    el.innerHTML = '';
+  };
 }
 
 let posicaoAnterior = null;

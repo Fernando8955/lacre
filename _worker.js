@@ -597,9 +597,49 @@ async function painel(url, env) {
     sou: r.token === token,
   }));
 
+  // Fecho do dia anterior: a pessoa jogou o dia inteiro e nunca via como
+  // terminou. Só faz sentido nas primeiras horas do dia seguinte.
+  let ontem = null;
+  const horasDeDia = (ts - (fimDoDia(dia) - 24 * 60 * 60 * 1000)) / (60 * 60 * 1000);
+  if (horasDeDia < 12) {
+    const diaOntem = diaDe(ts - 24 * 60 * 60 * 1000);
+    const topo = await env.DB.prepare(
+      `SELECT token, nome, partidas, vitorias, pontos FROM placar
+       WHERE dia = ? ORDER BY pontos DESC, fichas DESC, partidas ASC LIMIT 3`
+    )
+      .bind(diaOntem)
+      .all();
+
+    if ((topo.results || []).length) {
+      const todos = await env.DB.prepare(
+        `SELECT token, pontos, fichas, partidas FROM placar
+         WHERE dia = ? ORDER BY pontos DESC, fichas DESC, partidas ASC`
+      )
+        .bind(diaOntem)
+        .all();
+      const linhas = todos.results || [];
+      const idx = linhas.findIndex((r) => r.token === token);
+      ontem = {
+        dia: diaOntem,
+        podio: topo.results.map((r, i) => ({
+          posicao: i + 1,
+          nome: r.nome,
+          pontos: r.pontos,
+          vitorias: r.vitorias,
+          sou: r.token === token,
+        })),
+        total: linhas.length,
+        minhaPosicao: idx >= 0 ? idx + 1 : null,
+        meusPontos: idx >= 0 ? linhas[idx].pontos : null,
+        minhasPartidas: idx >= 0 ? linhas[idx].partidas : null,
+      };
+    }
+  }
+
   return json({
     nome: jogador.nome,
     dia,
+    ontem,
     meta: META_DIARIA,
     terminaEm: Math.floor((fimDoDia(dia) - ts) / 1000),
     eu: {

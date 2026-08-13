@@ -699,3 +699,54 @@ input[type="range"]::-moz-range-thumb {
   from { opacity: 0; transform: translateY(-4px) }
   to   { opacity: 1; transform: none }
 }
+
+/* --- Fecho da temporada anterior --- */
+.ontem { border-left: 3px solid var(--latao); }
+.ontem-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.fechar {
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: #8A7A66;
+  cursor: pointer;
+}
+.podio { display: flex; flex-direction: column; gap: 7px; }
+.podio-linha {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: #EDE6D6;
+}
+.podio-linha.sou { background: #FBEEEC; }
+.podio-pos {
+  font-family: var(--display);
+  font-size: 16px;
+  color: #8A7A66;
+  width: 22px;
+  flex: none;
+}
+.podio-linha:first-child .podio-pos { color: var(--latao); }
+.podio-nome {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.podio-pts {
+  font-family: var(--display);
+  font-size: 20px;
+  color: #2B2118;
+}
+.ontem-eu { margin-top: 12px; }
