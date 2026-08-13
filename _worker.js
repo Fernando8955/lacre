@@ -742,9 +742,6 @@ async function admin(url, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/admin' || url.pathname === '/admin/') {
-      return env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
-    }
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     if (!env.DB) return erro('O banco não está ligado ao site. Falta o binding DB.', 500);
 
