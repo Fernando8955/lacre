@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Lacre — painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --tinta: #131B24; --alta: #1C2733; --papel: #F4F0E6;
+  --lacre: #A93226; --latao: #C9A227; --verde: #4CAF7D;
+  --claro: #EDE8DC; --fraco: #8B99A7; --linha: rgba(237,232,220,.13);
+  --display: 'Fraunces', Georgia, serif; --corpo: 'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body {
+  background: var(--tinta); color: var(--claro); font-family: var(--corpo);
+  font-size: 15px; line-height: 1.5; padding: 24px 18px 80px;
+  -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+}
+.palco { max-width: 940px; margin: 0 auto }
+
+h1 { font-family: var(--display); font-size: 32px; font-weight: 600; line-height: 1 }
+h1 span { color: var(--lacre) }
+.topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px }
+h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--fraco); font-weight: 500; margin: 26px 0 10px }
+
+input, button { font: inherit }
+input[type="password"], input[type="date"] {
+  background: var(--alta); border: 1px solid var(--linha); color: var(--claro);
+  border-radius: 9px; padding: 9px 12px; font-size: 14px;
+}
+button {
+  background: var(--lacre); color: #FFF6F4; border: 0; border-radius: 9px;
+  padding: 10px 18px; font-weight: 500; cursor: pointer;
+}
+button.vazado { background: transparent; border: 1px solid var(--linha); color: var(--fraco) }
+
+.entrada { max-width: 340px; margin: 60px auto; text-align: center }
+.entrada h1 { margin-bottom: 6px }
+.entrada p { color: var(--fraco); font-size: 14px; margin-bottom: 20px }
+.entrada input { width: 100%; margin-bottom: 10px; text-align: center }
+.entrada button { width: 100% }
+.erro { color: #E8938A; font-size: 14px; margin-top: 10px; min-height: 20px }
+
+.cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px }
+.cartao { background: var(--alta); border-radius: 13px; padding: 15px 16px }
+.cartao .rot { font-size: 12px; color: var(--fraco) }
+.cartao .num { font-family: var(--display); font-size: 34px; line-height: 1.1; margin-top: 3px }
+.cartao .pe { font-size: 12px; color: var(--fraco); margin-top: 2px }
+.cartao.bom .num { color: var(--verde) }
+.cartao.alerta .num { color: var(--latao) }
+.cartao.ruim .num { color: #E8938A }
+
+.aviso {
+  background: rgba(201,162,39,.12); border-left: 3px solid var(--latao);
+  border-radius: 10px; padding: 13px 15px; font-size: 14px; line-height: 1.55; margin-top: 12px;
+}
+.aviso b { color: var(--latao) }
+
+.painel { background: var(--alta); border-radius: 13px; padding: 16px }
+
+.barras { display: flex; flex-direction: column; gap: 9px }
+.linha { display: grid; grid-template-columns: 118px 1fr 46px; align-items: center; gap: 10px; font-size: 14px }
+.linha .lab { color: var(--claro); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.trilha { background: rgba(237,232,220,.08); border-radius: 5px; height: 22px; overflow: hidden }
+.cheia { height: 100%; border-radius: 5px; background: var(--lacre); min-width: 2px; transition: width .5s ease }
+.cheia.latao { background: var(--latao) }
+.cheia.verde { background: var(--verde) }
+.linha .val { text-align: right; font-family: var(--display); font-size: 17px }
+
+.horas { display: flex; align-items: flex-end; gap: 3px; height: 120px; margin-top: 6px }
+.hora { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100% }
+.hora i { display: block; background: var(--lacre); border-radius: 3px 3px 0 0; min-height: 2px }
+.hora.vazia i { background: rgba(237,232,220,.09) }
+.horas-eixo { display: flex; gap: 3px; margin-top: 5px; font-size: 10px; color: var(--fraco) }
+.horas-eixo span { flex: 1; text-align: center }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px }
+th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fraco); font-weight: 500; padding: 0 6px 9px }
+td { padding: 10px 6px; border-top: 1px solid var(--linha) }
+td.n { text-align: right; font-family: var(--display); font-size: 17px }
+td.nome { font-weight: 500 }
+.pilula { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 20px; background: rgba(237,232,220,.1); color: var(--fraco) }
+.pilula.meta { background: rgba(76,175,125,.18); color: #7BD0A2 }
+
+.vazio { color: var(--fraco); font-size: 14px; padding: 8px 0 }
+</style>
+</head>
+<body>
+
+<div class="palco">
+  <div id="entrada" class="entrada">
+    <h1>Lacre <span>·</span> painel</h1>
+    <p>Área restrita</p>
+    <input id="senha" type="password" placeholder="Senha" autocomplete="current-password">
+    <button id="btn-entrar">Entrar</button>
+    <div class="erro" id="erro"></div>
+  </div>
+
+  <div id="conteudo" hidden></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let senha = sessionStorage.getItem('lacre_admin') || '';
+let dia = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+
+function n(x) { return (x === null || x === undefined) ? '—' : x; }
+
+async function carregar() {
+  const r = await fetch('/api/admin?senha=' + encodeURIComponent(senha) + '&dia=' + dia);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.erro || 'Falhou');
+  return d;
+}
+
+$('btn-entrar').onclick = async () => {
+  senha = $('senha').value.trim();
+  $('erro').textContent = '';
+  try {
+    const d = await carregar();
+    sessionStorage.setItem('lacre_admin', senha);
+    mostrar(d);
+  } catch (e) {
+    $('erro').textContent = e.message;
+  }
+};
+$('senha').onkeydown = (e) => { if (e.key === 'Enter') $('btn-entrar').click(); };
+
+function barras(itens, cor) {
+  if (!itens.length) return '<p class="vazio">Sem dados.</p>';
+  const max = Math.max(...itens.map((i) => i.valor), 1);
+  return '<div class="barras">' + itens.map((i) =>
+    '<div class="linha"><span class="lab">' + i.rotulo + '</span>' +
+    '<span class="trilha"><span class="cheia ' + (cor || '') + '" style="width:' +
+    Math.max(2, Math.round((i.valor / max) * 100)) + '%"></span></span>' +
+    '<span class="val">' + i.valor + '</span></div>'
+  ).join('') + '</div>';
+}
+
+function mostrar(d) {
+  $('entrada').hidden = true;
+  const c = $('conteudo');
+  c.hidden = false;
+
+  const r = d.resumo;
+  const retornoClasse = r.retorno >= 60 ? 'bom' : r.retorno >= 35 ? 'alerta' : 'ruim';
+
+  let h = '<div class="topo"><div><h1>Lacre <span>·</span> painel</h1>' +
+    '<p style="color:var(--fraco);font-size:14px;margin-top:4px">Temporada de ' + d.dia + '</p></div>' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<input type="date" id="dia" value="' + d.dia + '">' +
+    '<button class="vazado" id="btn-sair">Sair</button></div></div>';
+
+  // Os números que decidem
+  h += '<h2>O que aconteceu</h2><div class="cartoes">' +
+    cartao('Pessoas', r.pessoas, 'entraram e jogaram') +
+    cartao('Partidas', r.partidas, 'concluídas no dia') +
+    cartao('Voltaram', r.retorno + '%', r.jogaramMais + ' de ' + r.pessoas + ' jogaram 2 ou mais', retornoClasse) +
+    cartao('Jogaram só uma', r.soUma, 'e não voltaram', r.soUma > r.jogaramMais ? 'ruim' : '') +
+    cartao('Média', r.media, 'partidas por pessoa') +
+    cartao('Bateram a meta', r.completaram, 'chegaram a ' + d.meta) +
+    '</div>';
+
+  // Leituras que exigem cálculo
+  const avisos = [];
+  if (d.concentracao && d.concentracao.pct >= 50) {
+    avisos.push('<b>' + d.concentracao.nome + ' esteve em ' + d.concentracao.pct + '% das partidas</b> (' +
+      d.concentracao.partidas + ' de ' + r.partidas + '). O movimento do dia dependeu de uma pessoa só — sem ela, quem chegasse encontraria sala vazia.');
+  }
+  if (r.semPar > 0) {
+    avisos.push('<b>' + r.semPar + (r.semPar === 1 ? ' partida ficou' : ' partidas ficaram') + ' sem adversário.</b> Alguém abriu e ninguém apareceu na janela de tempo.');
+  }
+  if (r.pessoas && r.retorno < 35) {
+    avisos.push('<b>Retorno baixo:</b> a maioria jogou uma vez e não voltou. O problema está no começo da experiência, não no tráfego.');
+  }
+  if (avisos.length) h += '<h2>Leitura</h2>' + avisos.map((a) => '<div class="aviso">' + a + '</div>').join('');
+
+  // Funil
+  h += '<h2>Funil do dia</h2><div class="painel">' + barras([
+    { rotulo: 'Entraram', valor: d.funil.entrou },
+    { rotulo: 'Abriram partida', valor: d.funil.abriu },
+    { rotulo: 'Emparelharam', valor: d.funil.pareou },
+    { rotulo: 'Terminaram', valor: d.funil.terminou },
+  ], 'latao') + '</div>';
+
+  // Movimento por hora
+  const max = Math.max(...d.porHora.map((x) => x.total), 1);
+  h += '<h2>Movimento por hora</h2><div class="painel"><div class="horas">' +
+    d.porHora.map((x) =>
+      '<span class="hora' + (x.total ? '' : ' vazia') + '" title="' + x.hora + 'h: ' + x.total + '">' +
+      '<i style="height:' + Math.max(2, Math.round((x.total / max) * 100)) + '%"></i></span>'
+    ).join('') + '</div><div class="horas-eixo">' +
+    d.porHora.map((x) => '<span>' + (x.hora % 6 === 0 ? x.hora + 'h' : '') + '</span>').join('') +
+    '</div><p style="color:var(--fraco);font-size:13px;margin-top:10px">Pico é onde vale concentrar o anúncio.</p></div>';
+
+  // Como terminaram
+  if (d.fins.length) {
+    const nomes = { lotes: 'Decidida nos lotes', fichas: 'Decidida nas fichas', abandono: 'Abandono (prazo estourado)', empate: 'Empate total', 'sem-adversario': 'Sem adversário' };
+    h += '<h2>Como as partidas terminaram</h2><div class="painel">' +
+      barras(d.fins.map((f) => ({ rotulo: nomes[f.motivo] || f.motivo, valor: f.total })), 'verde') + '</div>';
+  }
+
+  // Quem jogou
+  h += '<h2>Quem jogou</h2><div class="painel">';
+  if (!d.jogadores.length) h += '<p class="vazio">Ninguém pontuou neste dia.</p>';
+  else {
+    h += '<table><thead><tr><th>Jogador</th><th>Partidas</th><th style="text-align:right">V</th>' +
+      '<th style="text-align:right">E</th><th style="text-align:right">D</th><th style="text-align:right">Pontos</th></tr></thead><tbody>';
+    for (const j of d.jogadores) {
+      h += '<tr><td class="nome">' + j.nome + '</td>' +
+        '<td>' + j.partidas + ' <span class="pilula' + (j.partidas >= d.meta ? ' meta' : '') + '">' +
+        (j.partidas >= d.meta ? 'meta' : j.partidas === 1 ? 'só uma' : '') + '</span></td>' +
+        '<td class="n">' + j.vitorias + '</td><td class="n">' + n(j.empates) + '</td>' +
+        '<td class="n">' + n(j.derrotas) + '</td><td class="n">' + j.pontos + '</td></tr>';
+    }
+    h += '</tbody></table>';
+  }
+  h += '</div>';
+
+  c.innerHTML = h;
+
+  $('dia').onchange = async (e) => {
+    dia = e.target.value;
+    try { mostrar(await carregar()); } catch (err) { alert(err.message); }
+  };
+  $('btn-sair').onclick = () => {
+    sessionStorage.removeItem('lacre_admin');
+    location.reload();
+  };
+}
+
+function cartao(rot, num, pe, cls) {
+  return '<div class="cartao ' + (cls || '') + '"><div class="rot">' + rot + '</div>' +
+    '<div class="num">' + num + '</div><div class="pe">' + pe + '</div></div>';
+}
+
+// Se a senha já está na sessão, entra direto.
+if (senha) {
+  carregar().then(mostrar).catch(() => { sessionStorage.removeItem('lacre_admin'); senha = ''; });
+}
+</script>
+</body>
+</html>

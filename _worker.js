@@ -661,34 +661,79 @@ async function admin(url, env) {
 
   const dia = String(url.searchParams.get('dia') || diaDe(agora()));
 
-  const eventos = await env.DB.prepare(
+  const ev = await env.DB.prepare(
     'SELECT tipo, COUNT(*) AS total FROM eventos WHERE dia = ? GROUP BY tipo'
-  )
-    .bind(dia)
-    .all();
+  ).bind(dia).all();
+  const eventos = {};
+  for (const e of ev.results || []) eventos[e.tipo] = e.total;
 
-  const jogadores = await env.DB.prepare(
-    `SELECT nome, partidas, vitorias, pontos FROM placar
+  const jg = await env.DB.prepare(
+    `SELECT nome, partidas, vitorias, empates, derrotas, pontos FROM placar
      WHERE dia = ? ORDER BY pontos DESC, partidas DESC`
-  )
-    .bind(dia)
-    .all();
+  ).bind(dia).all();
+  const jogadores = jg.results || [];
 
-  const resumo = await env.DB.prepare(
-    `SELECT COUNT(*) AS pessoas,
-            SUM(partidas) AS partidas,
-            SUM(CASE WHEN partidas >= 15 THEN 1 ELSE 0 END) AS completaram,
-            SUM(CASE WHEN partidas = 1 THEN 1 ELSE 0 END) AS so_uma
-     FROM placar WHERE dia = ?`
-  )
-    .bind(dia)
-    .first();
+  // Cada partida aparece uma vez para cada jogador, então o total real é metade.
+  const somaParticipacoes = jogadores.reduce((s, j) => s + j.partidas, 0);
+  const partidas = Math.round(somaParticipacoes / 2);
+  const pessoas = jogadores.length;
+  const jogaramMais = jogadores.filter((j) => j.partidas >= 2).length;
+  const soUma = jogadores.filter((j) => j.partidas === 1).length;
+  const completaram = jogadores.filter((j) => j.partidas >= META_DIARIA).length;
+
+  // Quanto do movimento dependeu de uma pessoa só. Foi o dado mais revelador
+  // do primeiro teste e não aparecia em lugar nenhum.
+  const maior = jogadores.reduce(
+    (m, j) => (!m || j.partidas > m.partidas ? j : m),
+    null
+  );
+  const concentracao = maior && partidas
+    ? { nome: maior.nome, partidas: maior.partidas, pct: Math.round((maior.partidas / partidas) * 100) }
+    : null;
+
+  // Partidas abertas que nunca encontraram adversário.
+  const abriu = eventos['abriu-partida'] || 0;
+  const pareou = eventos['pareou'] || 0;
+  const semPar = Math.max(0, abriu - pareou);
+
+  // Movimento por hora, para saber quando anunciar.
+  const horas = await env.DB.prepare(
+    "SELECT em FROM eventos WHERE dia = ? AND tipo = 'partida-fim'"
+  ).bind(dia).all();
+  const porHora = Array.from({ length: 24 }, (_, h) => ({ hora: h, total: 0 }));
+  for (const r of horas.results || []) {
+    const h = new Date(r.em + FUSO).getUTCHours();
+    porHora[h].total++;
+  }
+
+  // Como as partidas terminaram: no jogo ou por abandono.
+  const fins = await env.DB.prepare(
+    "SELECT extra, COUNT(*) AS total FROM eventos WHERE dia = ? AND tipo = 'partida-fim' GROUP BY extra"
+  ).bind(dia).all();
 
   return json({
     dia,
-    resumo: resumo || {},
-    eventos: eventos.results || [],
-    jogadores: jogadores.results || [],
+    meta: META_DIARIA,
+    resumo: {
+      pessoas,
+      partidas,
+      jogaramMais,
+      soUma,
+      completaram,
+      semPar,
+      media: pessoas ? Math.round((somaParticipacoes / pessoas) * 10) / 10 : 0,
+      retorno: pessoas ? Math.round((jogaramMais / pessoas) * 100) : 0,
+    },
+    concentracao,
+    funil: {
+      entrou: eventos['entrou'] || 0,
+      abriu,
+      pareou,
+      terminou: eventos['partida-fim'] || 0,
+    },
+    porHora,
+    fins: (fins.results || []).map((f) => ({ motivo: f.extra || 'lotes', total: f.total })),
+    jogadores,
   });
 }
 
@@ -697,6 +742,9 @@ async function admin(url, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/admin' || url.pathname === '/admin/') {
+      return env.ASSETS.fetch(new Request(new URL('/admin.html', url), request));
+    }
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     if (!env.DB) return erro('O banco não está ligado ao site. Falta o binding DB.', 500);
 
